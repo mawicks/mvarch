@@ -97,7 +97,10 @@ def test_history(data_source, tmp_path):
 
     tmp_path_store = stock_data.FileSystemStore(tmp_path)
     caching_download = stock_data.CachingDownloader(
-        data_source, tmp_path_store, stock_data.SymbolHistoryWriter
+        data_source,
+        tmp_path_store,
+        stock_data.SymbolHistoryWriter,
+        overwrite_existing=False,
     )
 
     response = caching_download(partial_symbol_set)
@@ -125,7 +128,9 @@ def test_history(data_source, tmp_path):
     assert len(response) == 0
 
     # Try loading one of the downloaded files
-    loader = stock_data.CachingSymbolHistoryLoader(data_source, tmp_path_store)
+    loader = stock_data.CachingSymbolHistoryLoader(
+        data_source, tmp_path_store, overwrite_existing=False
+    )
     # load("pqr")
     combiner = stock_data.PriceHistoryConcatenator()
     combiner(loader("pqr"))
