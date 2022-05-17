@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "stock-return-models"
-version = "0.1.0"
-description = ""
-authors = ["Mark Wicks <mawicks@gmail.com>"]
+name = "deep_volatility_models"
+version = "0.0.1"
+description = "Volatility models for stock prices using deep learning and mixture models."
+authors = ["Mark A Wicks <mawicks@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.8,<3.10"
