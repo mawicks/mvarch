@@ -59,11 +59,12 @@ for the past and for the trading day.
 
 # Future extensions
 
-Models generated as described above do not model correlations between symsols.
-It's possible to generate multivariate models that model the correlations
+Models generated as described above do not model correlations between symbols.
+It's possible to generate multivariate models that represent the correlations
 between symbols.
 
-The inference code described above infers the parameters of a mixture model
-representing the distrubtion of daily returns.  No
-code has been provided to sample these distributions to generate synthetic data.
+The inference code described above infers the parameters of a mixture
+model representing the distribution of daily returns.  No code has
+been provided here to sample these distributions to generate synthetic
+data.
 
