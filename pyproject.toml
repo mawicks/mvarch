@@ -11,6 +11,8 @@ torch = "^1.11.0"
 yfinance = "^0.1.59"
 matplotlib = "^3.4.0"
 sklearn = "^0.0"
+hyperopt = "^0.2"
+optuna = "^2.10"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
