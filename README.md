@@ -37,6 +37,12 @@ distribution of return has several uses:
    determine the *instantaneous* volatility to provide estimates of the distribution of
    daily returns during the next trading day (or the next few trading days)
 
+### Installation
+
+This package can be installed by running `pip install .` in the top level directory of a `git clone` checkout
+
+     pip install .
+
 ### Train a new model on a set of symbols:
 
 Ideally you would train models on a larger set of symbols.  Here we use a small
