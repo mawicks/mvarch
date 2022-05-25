@@ -1,3 +1,4 @@
 *.csv
 *.pt
 __pycache__
+*~
