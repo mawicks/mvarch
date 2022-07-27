@@ -1,6 +1,12 @@
 *.csv
 *.pt
-__pycache__
 *~
 *.log
 *.output
+*.png
+*.aux
+*.dvi
+*.pdf
+*.ps
+__pycache__
+.ipynb_checkpoints
