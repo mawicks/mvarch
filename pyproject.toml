@@ -5,7 +5,7 @@ description = "Volatility models for stock prices using deep learning and mixtur
 authors = ["Mark A Wicks <mawicks@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.8,<=3.10"
+python = "^3.8,<3.11"
 pandas = "^1.2.3"
 torch = "^1.12.0"
 yfinance = "^0.1.59"
