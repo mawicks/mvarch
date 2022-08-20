@@ -1,17 +1,14 @@
-# Deep Volatility Models (for stock prices)
+# Multivariate Volatility Models (ARCH) for stock prices and other time series)
 
-This package uses convolutional neural networks (implemented in PyTorch) to train mixture models to model
-the volatility of stock prices.
-
-A single model is trained on a number of different stock symbols.  Internally,
-an embedding is learned for each symbol.  In other words, a convolutional neural
-network learns general features of time series of daily returns that predict the
-volatilty along with an embedding that tunes the result for different symbolsl.
+This package uses a simple model for multivariate (and univariate) volatility (ARCH) models
 
 ## Motivation
 
-The volatility of stock returns changes daily.  The models produced by this
-package predict the *distribution* of the log returns for the next trading date.
+A number of multivariate volatility models exist in the literature (DCC, VECC, BEKK,  etc.).
+This package uses a general specification that includes a number of common models.
+Using this package you can generate either a DCC model or a BEKK model.
+
+The model predicts the *distribution* of the log returns for the next trading date.
 The actual turn is virtually impossible to predict, but predicting the
 distribution of return has several uses:
 
@@ -48,23 +45,14 @@ This package can be installed by running `pip install .` in the top level direct
 Ideally you would train models on a larger set of symbols.  Here we use a small
 set for demo purposes:
 
-    python -m deep_volatility_models.train_univariate -s SPY -s QQQ -s BND 
+    python -m mvarch.train_mvarch -s SPY -s QQQ -s BND 
 
 
 ### Evaluate the model on some of the symbols
 This script will produce a table and a plot with volatility and mean predictions
 for the past and for the trading day.
 
-    python -m deep)volatility_models.evaluate_model -s SPY -s BND
+    TBD
 
-# Future extensions
 
-Models generated as described above do not model correlations between symbols.
-It's possible to generate multivariate models that represent the correlations
-between symbols.
-
-The inference code described above infers the parameters of a mixture
-model representing the distribution of daily returns.  No code has
-been provided here to sample these distributions to generate synthetic
-data.
 

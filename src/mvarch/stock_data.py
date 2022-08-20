@@ -9,8 +9,8 @@ from typing import Any, Callable, Dict, Iterator, Iterable, Tuple, Union
 import pandas as pd
 
 # Local imports
-import deep_volatility_models.data_sources as data_sources
-import deep_volatility_models.util as util
+import . import data_sources
+import . import util
 
 # Initialization
 logging.basicConfig(level=logging.INFO)
