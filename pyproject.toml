@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "mvarch"
 version = "0.0.1"
-description = "Volatility models for stock prices using deep learning and mixture models."
+description = "Multivariate Volatility Models (ARCH) for stock prices and other time series"
 authors = ["Mark A Wicks <mawicks@gmail.com>"]
 
 [tool.poetry.dependencies]

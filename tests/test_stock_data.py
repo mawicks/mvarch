@@ -8,8 +8,8 @@ from unittest.mock import patch
 import pandas as pd
 
 # Local imports
-import deep_volatility_models.util as util
-import deep_volatility_models.stock_data as stock_data
+import mvarch.util as util
+import mvarch.stock_data as stock_data
 
 SAMPLE_DF = pd.DataFrame(
     {
@@ -77,7 +77,7 @@ def test_check_cache_exists_path(tmp_path):
     and check that exists is not case sensitive.
     """
     tmp_path_store = stock_data.FileSystemStore(tmp_path)
-    with patch("deep_volatility_models.stock_data.os.path.exists") as os_path_exists:
+    with patch("mvarch.stock_data.os.path.exists") as os_path_exists:
         tmp_path_store.exists("symbol1")
         os_path_exists.assert_called_with(
             os.path.join(tmp_path_store.cache_dir, "symbol1.csv")
