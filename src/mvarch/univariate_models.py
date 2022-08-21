@@ -115,14 +115,13 @@ class UnivariateScalingModel(Protocol):
         self.initialize_parameters(observations)
         self.log_parameters()
 
-        parameters = (
-            self.distribution.get_optimizable_parameters()
-            + self.mean_model.get_optimizable_parameters()
+        model_parameters = (
+            self.mean_model.get_optimizable_parameters()
             + self.get_optimizable_parameters()
         )
-        if len(parameters) > 0:
+        if len(model_parameters) > 0:
             optim = torch.optim.LBFGS(
-                parameters,
+                model_parameters + self.distribution.get_optimizable_parameters(),
                 max_iter=constants.PROGRESS_ITERATIONS,
                 lr=constants.LEARNING_RATE,
                 line_search_fn="strong_wolfe",
