@@ -12,7 +12,11 @@ import torch
 
 # Local modules
 from .data_sources import HugeStockMarketDatasetSource, YFinanceSource
-from .stock_data import PriceHistory, FileSystemStore, CachingSymbolHistoryLoader
+from .stock_data import (
+    PriceHistoryConcatenator,
+    FileSystemStore,
+    CachingSymbolHistoryLoader,
+)
 from .distributions import NormalDistribution, StudentTDistribution
 from .mean_models import ZeroMeanModel, ARMAMeanModel
 from .univariate_models import UnivariateUnitScalingModel, UnivariateARCHModel

@@ -5,8 +5,8 @@ import zipfile
 
 # Third party modules
 import numpy as np
-import pandas as pd
-import yfinance as yf
+import pandas as pd  # type: ignore
+import yfinance as yf  # type: ignore
 
 # Local modules
 from . import util

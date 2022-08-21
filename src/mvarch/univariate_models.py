@@ -201,7 +201,7 @@ class UnivariateScalingModel(Protocol):
         if isinstance(n, int):
             if not isinstance(self.n, int):
                 raise ValueError("Model has not been trained/initialized")
-            n = torch.randn(n, self.n)
+            n = self.distribution.get_instance().sample((n, self.n))
 
         scale = self._predict(n, sample=True, scale_initial_value=scale_initial_value)[
             0

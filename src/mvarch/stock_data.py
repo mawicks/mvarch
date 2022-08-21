@@ -6,11 +6,11 @@ import os
 from typing import Any, Callable, Dict, Iterator, Iterable, Tuple, Union
 
 # Third party libraries
-import pandas as pd
+import pandas as pd  # type: ignore
 
 # Local imports
-import . import data_sources
-import . import util
+from . import data_sources
+from . import util
 
 # Initialization
 logging.basicConfig(level=logging.INFO)

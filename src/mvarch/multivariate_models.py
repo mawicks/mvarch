@@ -445,12 +445,15 @@ class MultivariateARCHModel:
             )
 
         if isinstance(n, int):
-            n = torch.randn(n, self.n)
+            n = self.distribution.get_instance().sample((n, self.n))
+
+        # Next line is to keep mypy happy.
+        if not isinstance(n, torch.Tensor):
+            raise Exception("n isn't a tensor")
 
         mv_scale = self._predict(n, sample=True, scale_initial_value=initial_mv_scale)[
             0
         ]
-
         mv_scaled_noise = (mv_scale @ n.unsqueeze(2)).squeeze(2)
 
         output, uv_scale, uv_mean = self.univariate_model.sample(
