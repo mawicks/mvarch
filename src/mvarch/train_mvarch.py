@@ -95,7 +95,7 @@ def run(
     if use_hsmd:
         data_source = HugeStockMarketDatasetSource(use_hsmd)
     else:
-        data_source = FinanceSource()
+        data_source = YFinanceSource()
 
     history_loader = CachingSymbolHistoryLoader(data_source, data_store, refresh)
 
