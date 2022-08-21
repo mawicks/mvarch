@@ -76,6 +76,7 @@ def run(
     use_univariate=False,
     use_mean=False,
     constraint=ParameterConstraint.FULL,
+    distribution=NormalDistribution(),
 ):
     # Rewrite symbols with deduped, uppercase versions
     symbols = list(map(str.upper, set(symbols)))
@@ -118,8 +119,6 @@ def run(
         mean_model = ARMAMeanModel(device=device)
     else:
         mean_model = ZeroMeanModel(device=device)
-
-    distribution = StudentTDistribution(device)
 
     if use_univariate:
         univariate_model = UnivariateARCHModel(
@@ -253,6 +252,13 @@ def run(
     default="full",
     help="Type of constraint to be applied to multivariate parameters.",
 )
+@click.option(
+    "--distribution",
+    "-d",
+    type=click.Choice(["normal", "studentt"], case_sensitive=False),
+    default="normal",
+    help="Error distribution to use.",
+)
 def main_cli(
     use_hsmd,
     symbol,
@@ -265,6 +271,7 @@ def main_cli(
     use_univariate,
     use_mean,
     constraint,
+    distribution,
 ):
 
     constraints = {
@@ -275,6 +282,11 @@ def main_cli(
             ParameterConstraint.DIAGONAL,
             ParameterConstraint.SCALAR,
         ]
+    }
+
+    distributions = {
+        "normal": NormalDistribution,
+        "studentt": StudentTDistribution,
     }
 
     if start_date:
@@ -295,6 +307,7 @@ def main_cli(
         use_univariate=use_univariate,
         use_mean=use_mean,
         constraint=constraints[constraint],
+        distribution=distributions[distribution](device=device),
     )
 
 
