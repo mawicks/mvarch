@@ -225,6 +225,13 @@ class UnivariateUnitScalingModel(UnivariateScalingModel):
         device: Optional[torch.device] = None,
         mean_model: MeanModel = ZeroMeanModel(),
     ):
+        if not isinstance(mean_model, ZeroMeanModel):
+            raise ValueError(
+                f"Mean model: {type(mean_model)} Don't use a mean model "
+                " having parameters with a parameterless scaling model. "
+                "Change the mean model to ZeroMeanModel() or change the "
+                "univariate model to something with parameters."
+            )
         self.device = device
         self.distribution = distribution
         self.distribution.set_device(device)

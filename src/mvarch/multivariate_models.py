@@ -278,7 +278,7 @@ class MultivariateARCHModel:
 
             if not isinstance(self.univariate_model, UnivariateUnitScalingModel):
                 # Normalize the colums (while in upper triangular form)
-                # so that the univariate model deterines the variances
+                # so that the univariate model determines the variances
                 scale_t_T = torch.nn.functional.normalize(scale_t_T, dim=0)
 
             # Transpose ht to get the lower triangular version.
@@ -363,11 +363,7 @@ class MultivariateARCHModel:
         # Otherwise don't modify the parameter values obtained while
         # optimizing the univariate distribution.
         if isinstance(self.univariate_model, UnivariateUnitScalingModel):
-            parameters = (
-                parameters
-                + self.distribution.get_optimizable_parameters()
-                + self.univariate_model.mean_model.get_optimizable_parameters()
-            )
+            parameters = parameters + self.distribution.get_optimizable_parameters()
 
         optim = torch.optim.LBFGS(
             parameters,
@@ -395,6 +391,8 @@ class MultivariateARCHModel:
         optimize(optim, loss_closure, "multivariate model")
 
         self.distribution.log_parameters()
+        self.univariate_model.log_parameters()
+        self.univariate_model.mean_model.log_parameters()
         self.log_parameters()
 
         logging.debug("Gradients: ")
