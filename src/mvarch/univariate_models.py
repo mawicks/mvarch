@@ -384,7 +384,8 @@ class UnivariateARCHModel(UnivariateScalingModel):
                 f"a: {self.a.value.detach().numpy()}, "
                 f"b: {self.b.value.detach().numpy()}, "
                 f"c: {self.c.value.detach().numpy()}, "
-                f"d: {self.d.value.detach().numpy()}"
+                f"d: {self.d.value.detach().numpy()}, "
+                f"sample_scale: {self.sample_scale.numpy()}"
             )
             logging.info(f"sample_scale:\n{self.sample_scale}")
         else:

@@ -104,7 +104,12 @@ class MultivariateARCHModel:
     ):
         self.constraint = constraint
         self.univariate_model = univariate_model
-        self.distribution = distribution
+
+        if univariate_model:
+            self.distribution = univariate_model.distribution
+        else:
+            self.distribution = distribution
+
         self.distribution.set_device(device)
         self.device = device
 
@@ -131,7 +136,6 @@ class MultivariateARCHModel:
         self.b = self.parameter_type(n, constants.INITIAL_DECAY, self.device)
         self.c = self.parameter_type(n, 0.01, self.device)
         self.d = self.parameter_type(n, 1.0, self.device)
-        self.log_parameters()
 
     def set_parameters(self, a: Any, b: Any, c: Any, d: Any, sample_scale: Any) -> None:
         if not isinstance(a, torch.Tensor):
@@ -195,7 +199,8 @@ class MultivariateARCHModel:
                 f"a: {self.a.value.detach().numpy()},\n"
                 f"b: {self.b.value.detach().numpy()},\n"
                 f"c: {self.c.value.detach().numpy()},\n"
-                f"d: {self.d.value.detach().numpy()}"
+                f"d: {self.d.value.detach().numpy()}, \n"
+                f"sample_scale: {self.sample_scale.numpy()}"
             )
         else:
             logging.info("Multivariate ARCH model has no initialized parameters")
@@ -277,6 +282,11 @@ class MultivariateARCHModel:
 
             # Transpose ht to get the lower triangular version.
 
+            if self.univariate_model:
+                # Normalize the colums (while in upper triangular form)
+                # so that the univariate model deterines the variances
+                scale_t_T = torch.nn.functional.normalize(scale_t_T, dim=0)
+
             scale_t = make_diagonal_nonnegative(scale_t_T.T)
 
         scale = torch.stack(scale_sequence)
@@ -347,12 +357,15 @@ class MultivariateARCHModel:
             torch.linalg.qr(unscaled_centered_observations, mode="reduced")[1]
         ).T / torch.sqrt(torch.tensor(unscaled_centered_observations.shape[0]))
         self.sample_scale = make_diagonal_nonnegative(self.sample_scale)
-        logging.info(f"sample_scale:\n{self.sample_scale}")
 
-        parameters = (
-            self.get_optimizable_parameters()
-            + self.distribution.get_optimizable_parameters()
-        )
+        self.log_parameters()
+
+        parameters = self.get_optimizable_parameters()
+        # If there is no univariate model, tune the distribution.
+        # Otherwise don't modify the parameter values obtained while
+        # optimizing the univariate distribution.
+        if self.univariate_model is None:
+            parameter = parameters + self.distribution.get_optimizable_parameters()
 
         optim = torch.optim.LBFGS(
             parameters,
@@ -422,8 +435,8 @@ class MultivariateARCHModel:
     def sample(
         self,
         n: Union[torch.Tensor, int],
-        initial_mv_scale: Any,
-        initial_uv_scale: Any = None,
+        mv_scale_initial_value: Any = None,
+        uv_scale_initial_value: Any = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Generate a random sampled output from the model.
@@ -451,13 +464,13 @@ class MultivariateARCHModel:
         if not isinstance(n, torch.Tensor):
             raise Exception("n isn't a tensor")
 
-        mv_scale = self._predict(n, sample=True, scale_initial_value=initial_mv_scale)[
-            0
-        ]
+        mv_scale = self._predict(
+            n, sample=True, scale_initial_value=mv_scale_initial_value
+        )[0]
         mv_scaled_noise = (mv_scale @ n.unsqueeze(2)).squeeze(2)
 
         output, uv_scale, uv_mean = self.univariate_model.sample(
-            mv_scaled_noise, initial_uv_scale
+            mv_scaled_noise, uv_scale_initial_value
         )
 
         return output, mv_scale, uv_scale, uv_mean

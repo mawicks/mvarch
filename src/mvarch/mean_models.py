@@ -233,7 +233,8 @@ class ARMAMeanModel(MeanModel):
                 f"a: {self.a.value.detach().numpy()}, "
                 f"b: {self.b.value.detach().numpy()}, "
                 f"c: {self.c.value.detach().numpy()}, "
-                f"d: {self.d.value.detach().numpy()}"
+                f"d: {self.d.value.detach().numpy()}, "
+                f"sample_mean: {self.sample_mean.numpy()}"
             )
         else:
             logging.info("ARMA mean model has no initialized parameters")
@@ -242,7 +243,7 @@ class ARMAMeanModel(MeanModel):
         self,
         observations: torch.Tensor,
         sample=False,
-        initial_mean: Union[torch.Tensor, Any, None] = None,
+        mean_initial_value: Union[torch.Tensor, Any, None] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given a, b, c, d, and observations, generate the *estimated*
         standard deviations (marginal) for each observation
@@ -263,12 +264,12 @@ class ARMAMeanModel(MeanModel):
         if self.a is None or self.b is None or self.c is None or self.d is None:
             raise Exception("Mean model has not been fit()")
 
-        if initial_mean:
-            if not isinstance(initial_mean, torch.Tensor):
-                initial_mean = torch.tensor(
-                    initial_mean, dtype=torch.float, device=self.device
+        if mean_initial_value:
+            if not isinstance(mean_initial_value, torch.Tensor):
+                mean_initial_value = torch.tensor(
+                    mean_initial_value, dtype=torch.float, device=self.device
                 )
-            mu_t = initial_mean
+            mu_t = mean_initial_value
         else:
             mu_t = self.d @ self.sample_mean  # type: ignore
 

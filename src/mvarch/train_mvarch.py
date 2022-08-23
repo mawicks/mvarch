@@ -76,7 +76,8 @@ def run(
     use_univariate=False,
     use_mean=False,
     constraint=ParameterConstraint.FULL,
-    distribution=NormalDistribution(),
+    univariate_distribution=NormalDistribution(),
+    multivariate_distribution=NormalDistribution(),
 ):
     # Rewrite symbols with deduped, uppercase versions
     symbols = list(map(str.upper, set(symbols)))
@@ -122,16 +123,16 @@ def run(
 
     if use_univariate:
         univariate_model = UnivariateARCHModel(
-            mean_model=mean_model, distribution=distribution, device=device
+            mean_model=mean_model, distribution=univariate_distribution, device=device
         )
     else:
         univariate_model = UnivariateUnitScalingModel(
-            mean_model=mean_model, distribution=distribution, device=device
+            mean_model=mean_model, distribution=univariate_distribution, device=device
         )
 
     multivariate_model = MultivariateARCHModel(
         univariate_model=univariate_model,
-        distribution=distribution,
+        distribution=multivariate_distribution,
         constraint=constraint,
         device=device,
     )
@@ -146,6 +147,8 @@ def run(
         uv_scale_next,
         mu_next,
     ) = multivariate_model.predict(observations)
+
+    torch.save(multivariate_model, "model.pt")
     print("mv_scale: ", mv_scale.shape)
 
     # Compute some useful quantities to display and to record
@@ -307,7 +310,8 @@ def main_cli(
         use_univariate=use_univariate,
         use_mean=use_mean,
         constraint=constraints[constraint],
-        distribution=distributions[distribution](device=device),
+        univariate_distribution=distributions[distribution](device=device),
+        multivariate_distribution=distributions[distribution](device=device),
     )
 
 
