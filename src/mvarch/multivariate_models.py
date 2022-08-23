@@ -201,6 +201,30 @@ class MultivariateARCHModel:
         else:
             logging.info("Multivariate ARCH model has no initialized parameters")
 
+    def transform_matrix(self, scale_matrix):
+        # We require the scaling matrix to satisfy some constraints
+        # such as being lower traingular with positive diagonal
+        # entries (even when parameters are full).  This is similar to
+        # requiring the standard deviation to be positive.  It's
+        # transformed to an "equivalent" matrix satisfying the
+        # necessary properties.
+
+        # Unfortunately there's no QL factorization in PyTorch so we
+        # transpose m and use the QR.  We only need the 'R' return
+        # value, so the Q return value is dropped.
+
+        upper = torch.linalg.qr(scale_matrix.T, mode="reduced")[1]
+
+        if not isinstance(self.univariate_model, UnivariateUnitScalingModel):
+            # Normalize the colums (while in upper triangular form)
+            # so that the univariate model determines the variances
+            # and the multivariate model determines the correlations.
+            upper = torch.nn.functional.normalize(upper, dim=0)
+
+        # Transpose to make lower triangular, then make diagonal positive.
+        lower = make_diagonal_nonnegative(upper.T)
+        return lower
+
     def _predict(
         self,
         observations: torch.Tensor,
@@ -229,10 +253,9 @@ class MultivariateARCHModel:
         else:
             scale_t = self.d @ self.sample_scale
 
-        # We require ht to be lower traingular (even when parameters are full)
-        # Ensure this using QR.
-        scale_t_T = torch.linalg.qr(scale_t, mode="reduced")[1]
-        scale_t = scale_t_T.T
+        # We require the inttial scale matrix satisfy some constraints
+        # such as being lower traingular with positive diagonal entries
+        scale_t = self.transform_matrix(scale_t)
 
         if constants.DEBUG:
             print(f"Initial scale: {scale_t}")
@@ -256,7 +279,7 @@ class MultivariateARCHModel:
                 obs = scale_t @ obs
 
             b_o = (self.b @ obs).unsqueeze(1)
-            c_hbar = self.c @ self.sample_scale
+            c_sample_scale = self.c @ self.sample_scale
 
             # The covariance is a_ht @ a_ht.T + b_o @ b_o.T + (c @ sample_scale) @ (c @ sample_scale).T
             # Unnecessary squaring is discouraged for nunerical stability.
@@ -268,21 +291,10 @@ class MultivariateARCHModel:
             # formed explicitly in this code except at the very end when
             # it's time to return the covariance matrices to the user.
 
-            m = torch.cat((a_scale_t, b_o, c_hbar), dim=1)
+            m = torch.cat((a_scale_t, b_o, c_sample_scale), dim=1)
 
-            # Unfortunately there's no QL factorization in PyTorch so we
-            # transpose m and use the QR.  We only need the 'R' return
-            # value, so the Q return value is dropped.
-
-            scale_t_T = torch.linalg.qr(m.T, mode="reduced")[1]
-
-            if not isinstance(self.univariate_model, UnivariateUnitScalingModel):
-                # Normalize the colums (while in upper triangular form)
-                # so that the univariate model determines the variances
-                scale_t_T = torch.nn.functional.normalize(scale_t_T, dim=0)
-
-            # Transpose ht to get the lower triangular version.
-            scale_t = make_diagonal_nonnegative(scale_t_T.T)
+            # Transform `m` to an equivalent matrix having required dimensions and properties
+            scale_t = self.transform_matrix(m)
 
         scale = torch.stack(scale_sequence)
         return scale, scale_t
@@ -348,12 +360,10 @@ class MultivariateARCHModel:
         centered_observations = observations - uv_mean
         unscaled_centered_observations = centered_observations / uv_scale
 
-        sample_scale = (
-            torch.linalg.qr(unscaled_centered_observations, mode="reduced")[1]
-        ).T / torch.sqrt(torch.tensor(unscaled_centered_observations.shape[0]))
-        if not isinstance(self.univariate_model, UnivariateUnitScalingModel):
-            sample_scale = torch.nn.functional.normalize(sample_scale, dim=0)
-        self.sample_scale = make_diagonal_nonnegative(sample_scale)
+        self.sample_scale = self.transform_matrix(
+            unscaled_centered_observations.T
+            / torch.sqrt(torch.tensor(unscaled_centered_observations.shape[0]))
+        )
 
         self.log_parameters()
 
