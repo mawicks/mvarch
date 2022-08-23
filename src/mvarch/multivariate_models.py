@@ -99,16 +99,12 @@ class MultivariateARCHModel:
         self,
         constraint=ParameterConstraint.FULL,
         univariate_model: UnivariateScalingModel = UnivariateUnitScalingModel(),
-        distribution: Distribution = NormalDistribution(),
         device: torch.device = None,
     ):
         self.constraint = constraint
         self.univariate_model = univariate_model
 
-        if univariate_model:
-            self.distribution = univariate_model.distribution
-        else:
-            self.distribution = distribution
+        self.distribution = univariate_model.distribution
 
         self.distribution.set_device(device)
         self.device = device
@@ -280,13 +276,12 @@ class MultivariateARCHModel:
 
             scale_t_T = torch.linalg.qr(m.T, mode="reduced")[1]
 
-            # Transpose ht to get the lower triangular version.
-
-            if self.univariate_model:
+            if not isinstance(self.univariate_model, UnivariateUnitScalingModel):
                 # Normalize the colums (while in upper triangular form)
                 # so that the univariate model deterines the variances
                 scale_t_T = torch.nn.functional.normalize(scale_t_T, dim=0)
 
+            # Transpose ht to get the lower triangular version.
             scale_t = make_diagonal_nonnegative(scale_t_T.T)
 
         scale = torch.stack(scale_sequence)
@@ -353,19 +348,26 @@ class MultivariateARCHModel:
         centered_observations = observations - uv_mean
         unscaled_centered_observations = centered_observations / uv_scale
 
-        self.sample_scale = (
+        sample_scale = (
             torch.linalg.qr(unscaled_centered_observations, mode="reduced")[1]
         ).T / torch.sqrt(torch.tensor(unscaled_centered_observations.shape[0]))
-        self.sample_scale = make_diagonal_nonnegative(self.sample_scale)
+        if not isinstance(self.univariate_model, UnivariateUnitScalingModel):
+            sample_scale = torch.nn.functional.normalize(sample_scale, dim=0)
+        self.sample_scale = make_diagonal_nonnegative(sample_scale)
 
         self.log_parameters()
 
         parameters = self.get_optimizable_parameters()
         # If there is no univariate model, tune the distribution.
+        # and the mean model.
         # Otherwise don't modify the parameter values obtained while
         # optimizing the univariate distribution.
-        if self.univariate_model is None:
-            parameter = parameters + self.distribution.get_optimizable_parameters()
+        if isinstance(self.univariate_model, UnivariateUnitScalingModel):
+            parameters = (
+                parameters
+                + self.distribution.get_optimizable_parameters()
+                + self.univariate_model.mean_model.get_optimizable_parameters()
+            )
 
         optim = torch.optim.LBFGS(
             parameters,
