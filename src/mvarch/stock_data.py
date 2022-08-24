@@ -17,8 +17,8 @@ logging.basicConfig(level=logging.INFO)
 
 # This section defines the types that we will be using.
 
-Reader = Callable[[io.BufferedReader], pd.DataFrame]
-Writer = Callable[[io.BufferedWriter], None]
+Reader = Callable[[io.TextIOWrapper], pd.DataFrame]
+Writer = Callable[[io.TextIOWrapper], None]
 Concatenator = Callable[[Iterable[Tuple[str, pd.DataFrame]]], pd.DataFrame]
 ReaderFactory = Callable[[], Reader]
 WriterFactory = Callable[[Any], Writer]
@@ -51,7 +51,7 @@ def SymbolHistoryReader() -> Reader:
         file returns a history dataframe.
     """
 
-    def read_symbol_history(f: io.BufferedReader) -> pd.DataFrame:
+    def read_symbol_history(f: io.TextIOWrapper) -> pd.DataFrame:
         df = pd.read_csv(
             f,
             index_col="date",
@@ -70,7 +70,7 @@ def SymbolHistoryReader() -> Reader:
 
 
 def SymbolHistoryWriter(df: pd.DataFrame) -> Writer:
-    def write_symbol_history(f: io.BufferedWriter) -> None:
+    def write_symbol_history(f: io.TextIOWrapper) -> None:
         # Create an index on date and write to CSV in ascending order by date
         # with index=True
         indexed_df = df.copy()
@@ -135,7 +135,7 @@ class FileSystemStore(DataStore):
         Returns:
             None
         """
-        with open(self._path(symbol), "wb") as f:
+        with open(self._path(symbol), "w") as f:
             writer(f)
 
     def read(self, symbol: str, reader: Reader) -> Any:
@@ -146,7 +146,7 @@ class FileSystemStore(DataStore):
         Returns:
             pd.DataFrame - The associated dataframe.
         """
-        with open(self._path(symbol), "rb") as f:
+        with open(self._path(symbol), "r") as f:
             result = reader(f)
         return result
 

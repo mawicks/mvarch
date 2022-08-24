@@ -53,3 +53,5 @@ jobs:
         run: |
           source .venv/bin/activate
           mypy src/mvarch
+          pytest tests
+
