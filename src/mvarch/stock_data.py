@@ -135,7 +135,7 @@ class FileSystemStore(DataStore):
         Returns:
             None
         """
-        with open(self._path(symbol), "wb") as f:
+        with open(self._path(symbol), "w") as f:
             writer(f)
 
     def read(self, symbol: str, reader: Reader) -> Any:
@@ -146,7 +146,7 @@ class FileSystemStore(DataStore):
         Returns:
             pd.DataFrame - The associated dataframe.
         """
-        with open(self._path(symbol), "rb") as f:
+        with open(self._path(symbol), "r") as f:
             result = reader(f)
         return result
 

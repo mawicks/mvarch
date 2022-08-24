@@ -3,14 +3,17 @@ name = "mvarch"
 version = "0.0.1"
 description = "Multivariate Volatility Models (ARCH) for stock prices and other time series"
 authors = ["Mark A Wicks <mawicks@gmail.com>"]
+readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.7"
+python = ">=3.8, <4"
 pandas = ">=1"
 torch = ">=1"
 yfinance = ">=0.1"
 click = ">=8"
 pytz = "^2022.1"
+numpy = ">=1.22"
+urllib3 = ">=1.25"
 
 [tool.poetry.dev-dependencies]
 black = ">=22"
