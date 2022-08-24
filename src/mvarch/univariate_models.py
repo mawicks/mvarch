@@ -385,7 +385,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         return [self.a.value, self.b.value, self.c.value, self.d.value]
 
     def log_parameters(self) -> None:
-        if self.a and self.b and self.c and self.d:
+        if self.a and self.b and self.c and self.d and self.sample_scale:
             logging.info(
                 "Univariate variance model\n"
                 f"a: {self.a.value.detach().numpy()}, "
