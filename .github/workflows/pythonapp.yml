@@ -54,3 +54,4 @@ jobs:
           source .venv/bin/activate
           mypy src/mvarch
           pytest tests
+
