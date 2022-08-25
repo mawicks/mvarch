@@ -6,8 +6,8 @@ import torch
 
 
 def make_diagonal_nonnegative(m: torch.Tensor) -> torch.Tensor:
-    """Given a single lower triangular matrices m, return an `equivalent` matrix
-    having non-negative diagonal entries.  Here `equivalent` means m@m.T is unchanged.
+    """Given a single lower triangular matrix m, return an `equivalent` matrix
+    having non-negative diagonal entries.  Here `equivalent` means m @ m.T is unchanged.
 
     Arguments:
         m: torch.Tensor of shape (n,n) that is lower triangular
@@ -27,10 +27,15 @@ def random_lower_triangular(
     requires_grad: bool = True,
     device: Union[torch.device, None] = None,
 ) -> torch.Tensor:
+    """
+    This function returns a random lower triangular matrix of
+    dimension n by n, with entries uniformly distributed between
+    -scale and scale.
+    """
     if not isinstance(scale, torch.Tensor):
         scale = torch.tensor(scale, device=device)
     m = torch.rand(n, n, device=device) - 0.5
-    m = scale * make_diagonal_nonnegative(torch.tril(m))
+    m = 2.0 * torch.abs(scale) * make_diagonal_nonnegative(torch.tril(m))
     m.requires_grad = requires_grad
     return m
 
