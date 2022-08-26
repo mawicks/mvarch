@@ -72,9 +72,10 @@ def test_scalar_parameter(parameter_type, value, expect_value_error, other, expe
     else:
         parameter.set(value)
 
-        # Test __matmul__()
+        # Confirm that __matmul__() works using the @ operator
         other = torch.tensor(other, dtype=torch.float)
         expected = torch.tensor(expected, dtype=torch.float)
+
         result = parameter @ other
 
         print(f"parameter.value:\n{parameter.value}")
@@ -83,3 +84,14 @@ def test_scalar_parameter(parameter_type, value, expect_value_error, other, expe
         print(f"expected:\n{expected}")
 
         assert torch.all(result == expected)
+
+        # Confirm that gradients are being computed for parameter.value
+
+        # After the set(value) no gradient should exist:
+        assert parameter.value.grad is None
+
+        # Compute a scalar function of `result` and propagate gradients backward:
+        torch.mean(result).backward()
+
+        # Now the gradient should exist.
+        assert parameter.value.grad is not None
