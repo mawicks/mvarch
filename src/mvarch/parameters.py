@@ -19,13 +19,14 @@ class ParameterConstraint(Enum):
 
 class Parameter(Protocol):
     value: torch.Tensor
+    device: Optional[torch.device]
 
     @abstractmethod
     def __init__(self, n: int, scale: float, device: Optional[torch.device]):
         raise NotImplementedError
 
     @abstractmethod
-    def _validate_value(value: torch.Tensor):
+    def _validate_value(self, value: torch.Tensor) -> None:
         raise NotImplementedError
 
     def set(self, value: Any) -> None:

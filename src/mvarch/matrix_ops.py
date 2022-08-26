@@ -5,8 +5,9 @@ from typing import Union
 import torch
 
 
+@torch.no_grad()
 def is_lower_triangular(m: torch.Tensor) -> bool:
-    return torch.all(torch.tril(m) == m)
+    return bool(torch.all(torch.tril(m) == m))
 
 
 def make_diagonal_nonnegative(m: torch.Tensor) -> torch.Tensor:
