@@ -7,6 +7,8 @@ from enum import Enum
 # Common packages
 import torch
 
+from . import matrix_ops
+
 
 class ParameterConstraint(Enum):
     SCALAR = "scalar"
@@ -23,8 +25,17 @@ class Parameter(Protocol):
         raise NotImplementedError
 
     @abstractmethod
-    def set(self, value: Any) -> None:
+    def _validate_value(value: torch.Tensor):
         raise NotImplementedError
+
+    def set(self, value: Any) -> None:
+        if not isinstance(value, torch.Tensor):
+            value = torch.tensor(
+                value, device=self.device, dtype=torch.float, requires_grad=True
+            )
+
+        self._validate_value(value)
+        self.value = value
 
     @abstractmethod
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
@@ -36,15 +47,12 @@ class ScalarParameter(Parameter):
         self, n: int, scale: float = 1.0, device: Optional[torch.device] = None
     ):
         self.device = device
-        self.value = scale * torch.tensor(1.0, device=device)
+        self.value = torch.tensor(scale, device=device)
         self.value.requires_grad = True
 
-    def set(self, value: Any) -> None:
-        if not isinstance(value, torch.Tensor):
-            value = torch.tensor(
-                value, device=self.device, dtype=torch.float, requires_grad=True
-            )
-        self.value = value
+    def _validate_value(self, value: torch.Tensor) -> None:
+        if len(value.shape) != 0:
+            raise ValueError(f"Value isn't a scalar: {value}")
 
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
         try:
@@ -64,20 +72,16 @@ class DiagonalParameter(Parameter):
         self.value = scale * torch.ones(n, device=device)
         self.value.requires_grad = True
 
-    def set(self, value: Any) -> None:
-        if not isinstance(value, torch.Tensor):
-            value = torch.tensor(
-                value, device=self.device, dtype=torch.float, requires_grad=True
-            )
-
+    def _validate_value(self, value: torch.Tensor) -> None:
         if len(value.shape) != 1:
-            raise ValueError(f"value: {value} should have one and only one dimension")
-
-        self.value = value
+            raise ValueError(f"Value isn't a vector: {value}")
 
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
         try:
-            return self.value * other
+            # Because `other` is square, if we just use `*` here, there's ambiguity
+            # whether we're operating on rows or columns (should be rows).
+            # Use unsqueeze() and expand() to disambiguate what should happen.
+            return self.value.unsqueeze(1).expand(other.shape) * other
         except Exception as e:
             print(e)
             print(f"self.value: {self.value}")
@@ -93,12 +97,12 @@ class TriangularParameter(Parameter):
         self.value = scale * torch.eye(n, device=device)
         self.value.requires_grad = True
 
-    def set(self, value: Any) -> None:
-        if not isinstance(value, torch.Tensor):
-            value = torch.tensor(
-                value, device=self.device, dtype=torch.float, requires_grad=True
-            )
-        self.value = torch.tril(value)
+    def _validate_value(self, value: torch.Tensor) -> None:
+        if len(value.shape) != 2 or value.shape[0] != value.shape[1]:
+            raise ValueError(f"Value isn't a square matrix: {value}")
+
+        if not matrix_ops.is_lower_triangular(value):
+            raise ValueError(f"Value isn't lower triangular: {value}")
 
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
         # self.value was initialized to be triangular, so the
@@ -114,7 +118,7 @@ class TriangularParameter(Parameter):
             raise e
 
 
-class FullParameter:
+class FullParameter(Parameter):
     def __init__(
         self, n: int, scale: float = 1.0, device: Optional[torch.device] = None
     ):
@@ -122,12 +126,9 @@ class FullParameter:
         self.value = scale * torch.eye(n, device=device)
         self.value.requires_grad = True
 
-    def set(self, value: Any) -> None:
-        if not isinstance(value, torch.Tensor):
-            value = torch.tensor(
-                value, device=self.device, dtype=torch.float, requires_grad=True
-            )
-        self.value = value
+    def _validate_value(self, value: torch.Tensor) -> None:
+        if len(value.shape) != 2 or value.shape[0] != value.shape[1]:
+            raise ValueError(f"Value isn't a square matrix: {value}")
 
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
         try:

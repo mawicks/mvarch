@@ -7,6 +7,22 @@ from mvarch import matrix_ops
 
 
 @pytest.mark.parametrize(
+    "m, expected",
+    [
+        ([[1]], True),
+        ([[1, 0], [2, 3]], True),
+        ([[1, 3], [2, 3]], False),
+        ([[1, 0, 0], [-2, 1, 0], [3, -5, 1]], True),
+        ([[1, 0, 1], [-2, 1, 0], [3, -5, 1]], False),
+        ([[1, 0, 1], [0, 1, 2], [0, 0, 1]], False),
+    ],
+)
+def test_is_lower_triangular(m, expected):
+    m = torch.tensor(m)
+    assert matrix_ops.is_lower_triangular(m) == expected
+
+
+@pytest.mark.parametrize(
     "m",
     [
         [[1, 0, 0], [-2, 1, 0], [3, -5, 1]],
@@ -27,7 +43,7 @@ def test_make_diagonal_nonnegative(m):
     n = matrix_ops.make_diagonal_nonnegative(m)
 
     # Ensure that n is lower triangular.
-    assert torch.all(n == torch.tril(n))
+    assert matrix_ops.is_lower_triangular(n)
 
     # Ensure diagonal is nonnegative
     assert torch.all(torch.diag(n) >= 0.0)
@@ -58,7 +74,7 @@ def test_random_lower_triangular():
                 assert m.shape == (n, n)
 
                 # Confirm that it's lower triangular
-                assert torch.all(m == torch.tril(m))
+                assert matrix_ops.is_lower_triangular(m)
 
                 # No entry should be larger than scale
                 assert torch.max(torch.abs(m)) <= scale

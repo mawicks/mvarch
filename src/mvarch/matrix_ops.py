@@ -5,6 +5,10 @@ from typing import Union
 import torch
 
 
+def is_lower_triangular(m: torch.Tensor) -> bool:
+    return torch.all(torch.tril(m) == m)
+
+
 def make_diagonal_nonnegative(m: torch.Tensor) -> torch.Tensor:
     """Given a single lower triangular matrix m, return an `equivalent` matrix
     having non-negative diagonal entries.  Here `equivalent` means m @ m.T is unchanged.
