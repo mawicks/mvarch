@@ -218,7 +218,7 @@ class ARMAMeanModel(MeanModel):
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         if self.a is None or self.b is None or self.c is None or self.d is None:
-            raise ValueError("ARMAMeanModel parameters have not been initialized")
+            raise RuntimeError("ARMAMeanModel parameters have not been initialized")
         return [self.a.value, self.b.value, self.c.value, self.d.value]
 
     def log_parameters(self):
@@ -257,7 +257,7 @@ class ARMAMeanModel(MeanModel):
 
         """
         if self.a is None or self.b is None or self.c is None or self.d is None:
-            raise Exception("Mean model has not been fit()")
+            raise RuntimeError("Mean model has not been fit()")
 
         if mean_initial_value:
             if not isinstance(mean_initial_value, torch.Tensor):
