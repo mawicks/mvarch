@@ -23,11 +23,11 @@ class Parameter(Protocol):
 
     @abstractmethod
     def __init__(self, n: int, scale: float, device: Optional[torch.device]):
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def _validate_value(self, value: torch.Tensor) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     def set(self, value: Any) -> None:
         if not isinstance(value, torch.Tensor):
@@ -40,7 +40,7 @@ class Parameter(Protocol):
 
     @abstractmethod
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
 
 class ScalarParameter(Parameter):
@@ -56,13 +56,7 @@ class ScalarParameter(Parameter):
             raise ValueError(f"Value isn't a scalar: {value}")
 
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
-        try:
-            return self.value * other
-        except Exception as e:
-            print(e)
-            print(f"self.value: {self.value}")
-            print(f"other: {other}")
-            raise e
+        return self.value * other
 
 
 class DiagonalParameter(Parameter):
@@ -141,7 +135,6 @@ class FullParameter(Parameter):
             raise e
 
 
-if __name__ == "__main__":
-
+if __name__ == "__main__":  # pragma: no cover
     t = TriangularParameter(3, 10.0)
     print(t.value)

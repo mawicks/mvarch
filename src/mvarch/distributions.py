@@ -13,23 +13,23 @@ class Distribution(Protocol):
 
     @abstractmethod
     def set_parameters(self, **kwargs: Any) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_parameters(self) -> Dict[str, Any]:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def log_parameters(self) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_instance(self) -> torch.distributions.Distribution:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     def set_device(self, device) -> None:
         self.device = device
@@ -89,7 +89,6 @@ class StudentTDistribution(Distribution):
         return torch.distributions.studentT.StudentT(self.df)
 
 
-if __name__ == "__main__":
-
+if __name__ == "__main__":  # pragma: no cover
     n = NormalDistribution()
     t = StudentTDistribution()
