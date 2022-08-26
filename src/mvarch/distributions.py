@@ -62,31 +62,31 @@ class NormalDistribution(Distribution):
 class StudentTDistribution(Distribution):
     def __init__(self, device=None):
         self.device = device
-        self.dof = torch.tensor(
+        self.df = torch.tensor(
             6.0, dtype=torch.float, device=device, requires_grad=True
         )
 
     def set_parameters(self, **kwargs: Any) -> None:
-        dof = kwargs["dof"]
+        df = kwargs["df"]
 
-        if not isinstance(dof, torch.Tensor):
-            dof = torch.tensor(dof, dtype=torch.float, device=self.device)
-        dof.requires_grad = True
-        self.dof = dof
+        if not isinstance(df, torch.Tensor):
+            df = torch.tensor(df, dtype=torch.float, device=self.device)
+        df.requires_grad = True
+        self.df = df
 
     def get_parameters(self) -> Dict[str, Any]:
-        return {"dof": self.dof}
+        return {"df": self.df}
 
     def log_parameters(self) -> None:
-        logging.info(f"StudentT DOF: {self.dof:.3f}")
+        logging.info(f"StudentT DF: {self.df:.3f}")
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
-        print("dof: ", self.dof)
+        print("df: ", self.df)
 
-        return [self.dof]
+        return [self.df]
 
     def get_instance(self) -> torch.distributions.Distribution:
-        return torch.distributions.studentT.StudentT(self.dof)
+        return torch.distributions.studentT.StudentT(self.df)
 
 
 if __name__ == "__main__":
