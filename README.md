@@ -1,3 +1,5 @@
+[![test](https://github.com/mawicks/mvarch/actions/workflows/pythonapp.yml/badge.svg)](https://github.com/mawicks/mvarch/actions/workflows/pythonapp.yml)
+
 # Multivariate Volatility Models (ARCH) for stock prices and other time series)
 
 This package uses a simple model for multivariate (and univariate) volatility (ARCH) models
