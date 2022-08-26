@@ -5,7 +5,7 @@ import os
 from unittest.mock import patch
 
 # Third party modules
-import pandas as pd
+import pandas as pd  # type: ignore
 
 # Local imports
 import mvarch.util as util
