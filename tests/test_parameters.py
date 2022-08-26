@@ -17,11 +17,24 @@ from mvarch.parameters import (
     [
         #
         # ScalarParameter test cases
-        (ScalarParameter, 2.0, False, [[1, 2], [3, 9]], False, [[2, 4], [6, 18]]),
+        # Valid multiplication by another matrix
+        (
+            ScalarParameter,
+            2.0,
+            False,
+            [[1, 2], [3, 9]],
+            False,
+            [[2, 4], [6, 18]],
+        ),
+        # Valid multiplication by another vector
+        (ScalarParameter, 2.0, False, [1, 2], False, [2, 4]),
+        # Invalid vector parameter
         (ScalarParameter, [1, 2], True, None, False, None),
+        # Invalid matrix parameter
         (ScalarParameter, [[1, 2], [3, 4]], True, None, False, None),
         #
         # DiagonalParameter test cases
+        # Valid multiplication by another matrix
         (
             DiagonalParameter,
             [5, 7],
@@ -30,11 +43,31 @@ from mvarch.parameters import (
             False,
             [[5, 10], [21, 63]],
         ),
-        (DiagonalParameter, [5, 7], False, [[1, 2], [3, 4], [5, 6]], True, None),
+        # Valid multiplication by another vector
+        (
+            DiagonalParameter,
+            [5, 7],
+            False,
+            [1, 2],
+            False,
+            [5, 14],
+        ),
+        # Other matrix doesn't conform
+        (
+            DiagonalParameter,
+            [5, 7],
+            False,
+            [[1, 2], [3, 4], [5, 6]],
+            True,
+            None,
+        ),
+        # Scalar parameter isn't valid
         (DiagonalParameter, 2.0, True, None, False, None),
+        # Matrix parameter isn't valid
         (DiagonalParameter, [[1, 2], [3, 4]], True, None, False, None),
         #
         # TriangularParameter test cases
+        # Valid multiplication by another matrix
         (
             TriangularParameter,
             [[5, 0], [7, 11]],
@@ -43,6 +76,16 @@ from mvarch.parameters import (
             False,
             [[5, 10], [40, 113]],
         ),
+        # Valid multiplication by another vector
+        (
+            TriangularParameter,
+            [[5, 0], [7, 11]],
+            False,
+            [1, 2],
+            False,
+            [5, 29],
+        ),
+        # Other matrix doesn't conform
         (
             TriangularParameter,
             [[5, 0], [7, 11]],
@@ -51,8 +94,11 @@ from mvarch.parameters import (
             True,
             None,
         ),
+        # Invalid scalar parameter
         (TriangularParameter, 2.0, True, None, False, None),
+        # Invalid vector parameter
         (TriangularParameter, [1, 2], True, None, False, None),
+        # Invalid full matrix parameter
         (
             TriangularParameter,
             [[1, 2], [3, 4]],
@@ -63,6 +109,7 @@ from mvarch.parameters import (
         ),  # Not triangular
         #
         # FullParameter test cases
+        # Valid mulitplication by another matrix (lower triangular parameter)
         (
             FullParameter,
             [[5, 0], [7, 11]],
@@ -70,7 +117,8 @@ from mvarch.parameters import (
             [[1, 2], [3, 9]],
             False,
             [[5, 10], [40, 113]],
-        ),
+        ),  # Other matrix
+        # Valid mulitplication by another matrix
         (
             FullParameter,
             [[5, 7], [11, 13]],
@@ -82,6 +130,16 @@ from mvarch.parameters import (
                 [50, 139],
             ],
         ),
+        # Valid multiplication by another vector
+        (
+            FullParameter,
+            [[5, 7], [11, 13]],
+            False,
+            [1, 2],
+            False,
+            [19, 37],
+        ),
+        # Other matrix doesn't conform
         (
             FullParameter,
             [[5, 7], [11, 13]],
@@ -93,8 +151,10 @@ from mvarch.parameters import (
                 [50, 139],
             ],
         ),
+        # Scalar parameter isn't valid
         (FullParameter, 2.0, True, None, False, None),
-        (FullParameter, [1, 2], True, None, False, None),
+        # Vector parameter isn't valid
+        (FullParameter, [1, 2], True, None, False, None),  # Vector not allowed
     ],
 )
 def test_scalar_parameter(

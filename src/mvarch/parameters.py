@@ -73,10 +73,15 @@ class DiagonalParameter(Parameter):
 
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
         try:
-            # Because `other` is square, if we just use `*` here, there's ambiguity
-            # whether we're operating on rows or columns (should be rows).
-            # Use unsqueeze() and expand() to disambiguate what should happen.
-            return self.value.unsqueeze(1).expand(other.shape) * other
+            # If `other` is square and we blindly use `*` here, there's
+            # ambiguity whether we're operating on rows or columns
+            # (should be rows).  Use unsqueeze() and expand() to
+            # disambiguate what should happen.
+            if len(other.shape) > 1:
+                return self.value.unsqueeze(1).expand(other.shape) * other
+            else:
+                return self.value * other
+
         except Exception as e:
             print(e)
             print(f"self.value: {self.value}")
