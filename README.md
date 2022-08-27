@@ -6,9 +6,10 @@ This package uses a simple model for multivariate (and univariate) volatility (A
 
 ## Motivation
 
-A number of multivariate volatility models exist in the literature (DCC, VECC, BEKK,  etc.).
-This package uses a general specification that includes a number of common models.
-Using this package you can generate either a DCC model or a BEKK model.
+A number of multivariate volatility models exist in the literature
+(DCC, VECC, BEKK, etc.).  This package uses a general specification
+that includes a number of common models.  Using this package you can
+generate either a DCC model or a BEKK model.
 
 The model predicts the *distribution* of the log returns for the next trading date.
 The actual turn is virtually impossible to predict, but predicting the
