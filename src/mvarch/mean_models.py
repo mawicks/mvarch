@@ -261,7 +261,7 @@ class ARMAMeanModel(MeanModel):
 
         mu_sequence = []
 
-        for k, obs in enumerate(observations):
+        for obs in observations:
             # Store the current mu_t before predicting next one
             mu_sequence.append(mu_t)
 

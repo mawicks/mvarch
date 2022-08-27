@@ -163,8 +163,8 @@ def CachingDownloader(
     Arguments:
         data_source: Callable[[Union[str, Iterable[str]]], Dict[str,
         pd.DataFrame]] -  A datasource function which given a list of symbols
-        returns a dictionary keyed by the symbol with values that are dataframe with history data for
-        that symbol.
+        returns a dictionary keyed by the symbol with values that are dataframe
+        with history data for that symbol.
 
         data_store: FilesystemStore (or similar) - An implementation of a data_store class (see
         FileSystemStore above)
@@ -211,8 +211,7 @@ def CachingDownloader(
 
 def PriceHistoryConcatenator() -> Concatenator:
     def concatenator(sequence: Iterable[Tuple[str, pd.DataFrame]]) -> pd.DataFrame:
-        """
-        Return a dataframe containing all historic values for the given set of symbosl.
+        """Return a dataframe containing all historic values for the given set of symbosl.
         The dates are inner joined so there is one row for each date where all symbols
         have a value for that date.  The row index for the returned dataframe is the
         date.  The column is a muli-level index where the first position is the symbol
@@ -224,17 +223,20 @@ def PriceHistoryConcatenator() -> Concatenator:
 
         df.loc[:, (symbol_list, 'log_return')]
 
-        This is intended for a portfolio, but you can specify just one stock if that's all that's required:
+        This is intended for a portfolio, but you can specify just one
+        stock if that's all that's required:
 
         df.loc[:, (symbol, 'log_return')]
 
         Arguments:
             symbols:  Union[Iterable[str], str] - a list of symbols of interest
-            overwrite_existing: bool - whether to overwrite previously downloaded data (default False)
+            overwrite_existing: bool - whether to overwrite previously
+                downloaded data (default False)
 
         Returns
             pd.DataFrame - The column is a muli-level index where the first position is the symbol
             and the second position is the value of interest (e.g., "close", "log_return", etc.)
+
         """
         dataframes = []
         symbols = []

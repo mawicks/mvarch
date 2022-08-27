@@ -58,7 +58,9 @@ def prepare_data(
 
     symbol_list = sorted(symbol_list)
     full_history = combiner(history_loader(symbol_list))
-    training_data = full_history.loc[start_date:end_date, (symbol_list, "log_return")]  # type: ignore
+    training_data = full_history.loc[
+        start_date:end_date, (symbol_list, "log_return")  # type: ignore
+    ]
     print(training_data.columns)
 
     return training_data
@@ -145,6 +147,7 @@ def run(
         uv_scale_next,
         mu_next,
     ) = multivariate_model.predict(observations)
+    print("mu_next: \n", mu_next)
 
     torch.save(multivariate_model, "model.pt")
     print("mv_scale: ", mv_scale.shape)

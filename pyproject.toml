@@ -15,6 +15,7 @@ pytz = "^2022.1"
 numpy = ">=1.22"
 urllib3 = ">=1.25"
 coverage = "^6.4.4"
+pylint = "^2.15.0"
 
 [tool.poetry.dev-dependencies]
 black = ">=22"

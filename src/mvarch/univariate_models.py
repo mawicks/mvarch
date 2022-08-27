@@ -27,9 +27,11 @@ def marginal_conditional_log_likelihood(
        observations: torch.Tensor of shape (n_obs, n_symbols)
        scale: torch.Tensor of shape (n_obs, n_symbols)
            Contains the estimated univariate (marginal) standard deviation for each observation.
-       distribution: torch.distributions.distribution.Distribution instance which should have a log_prob() method.
-           Note we assume distrubution was constructed with center=0 and shape=1.  Any normalizing and recentering
-           is achieved by explicit`transformations` here.
+       distribution: torch.distributions.distribution.Distribution instance
+            which should have a log_prob() method.
+
+       Note we assume distrubution was constructed with center=0 and shape=1.
+       Any normalizing and recentering is achieved by explicit`transformations` here.
 
     Returns the mean log_likelihood"""
 
@@ -155,8 +157,9 @@ class UnivariateScalingModel(Protocol):
         return scale, mu, scale_next, mu_next
 
     def __mean_log_likelihood(self, observations: torch.Tensor) -> torch.Tensor:
-        """
-        Compute and return the mean (per-sample) log likelihood (the total log likelihood divided by the number of samples).
+        """Compute and return the mean (per-sample) log likelihood (the total
+        log likelihood divided by the number of samples).
+
         """
         mu = self.mean_model._predict(observations)[0]
         centered_observations = observations - mu
@@ -168,9 +171,11 @@ class UnivariateScalingModel(Protocol):
 
     @torch.no_grad()
     def mean_log_likelihood(self, observations: torch.Tensor) -> float:
-        """
-        This is the inference version of mean_log_likelihood(), which is the version clients would normally use.
-        It computes the mean per-sample log likelihood (the total log likelihood divided by the number of samples).
+        """This is the inference version of mean_log_likelihood(), which is
+        the version clients would normally use.  It computes the mean
+        per-sample log likelihood (the total log likelihood divided by
+        the number of samples).
+
         """
         return float(self.__mean_log_likelihood(observations))
 
@@ -434,7 +439,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         scale_t = torch.maximum(scale_t, torch.tensor(float(constants.EPS)))
         scale_sequence = []
 
-        for k, obs in enumerate(centered_observations):
+        for obs in centered_observations:
             # Store the current ht before predicting next one
             scale_sequence.append(scale_t)
 
