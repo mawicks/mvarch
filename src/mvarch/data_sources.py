@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 DataSource = Callable[[Union[str, Iterable[str]]], Dict[str, pd.DataFrame]]
 
 
-def YFinanceSource() -> DataSource:
+def YFinanceSource() -> DataSource:  # pragma: no cover
     """
     Sample usage:
     >>> from deep_volatility_models import data_sources
@@ -70,7 +70,7 @@ def YFinanceSource() -> DataSource:
     return price_history
 
 
-def HugeStockMarketDatasetSource(zip_filename) -> DataSource:
+def HugeStockMarketDatasetSource(zip_filename) -> DataSource:  # pragma: no cover
     """
     Sample usage
     >>> from deep_volatility_models import data_sources

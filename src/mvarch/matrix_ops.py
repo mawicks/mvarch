@@ -45,8 +45,6 @@ def random_lower_triangular(
     return m
 
 
-if __name__ == "__main__":
-
+if __name__ == "__main__":  # pragma: no coverage
     rlt = random_lower_triangular(3, 10.0)
-
     print(rlt)

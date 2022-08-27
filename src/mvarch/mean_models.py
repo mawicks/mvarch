@@ -20,23 +20,23 @@ from .parameters import (
 class MeanModel(Protocol):
     @abstractmethod
     def initialize_parameters(self, observations: torch.Tensor):
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def set_parameters(self, **kwargs: Any) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_parameters(self) -> Dict[str, Any]:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def log_parameters(self) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def _predict(
@@ -61,7 +61,6 @@ class MeanModel(Protocol):
             mu_next: torch.Tensor prediction for next unobserved value
 
         """
-        raise NotImplementedError
 
     @torch.no_grad()
     def predict(
@@ -81,7 +80,7 @@ class MeanModel(Protocol):
     ) -> torch.Tensor:
         # mu = self.__predict(scaled_zero_mean_noise, sample=True, initial_mean=initial_mean)
         # return mu
-        raise Exception("sample() called.")
+        raise Exception("sample() called on a MeanModel.")
 
 
 class ZeroMeanModel(MeanModel):
@@ -136,7 +135,6 @@ class ZeroMeanModel(MeanModel):
 
 
 class ARMAMeanModel(MeanModel):
-    n: Union[int, None]
     a: Union[Parameter, None]
     b: Union[Parameter, None]
     c: Union[Parameter, None]
@@ -148,18 +146,16 @@ class ARMAMeanModel(MeanModel):
         self,
         device: Union[torch.device, None] = None,
     ):
-        self.n = self.a = self.b = self.c = self.d = None
+        self.a = self.b = self.c = self.d = None
         self.sample_mean = None
         self.device = device
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        self.n = observations.shape[1]
-        self.a = DiagonalParameter(
-            self.n, 1.0 - constants.INITIAL_DECAY, device=self.device
-        )
-        self.b = DiagonalParameter(self.n, constants.INITIAL_DECAY, device=self.device)
-        self.c = DiagonalParameter(self.n, 1.0, device=self.device)
-        self.d = DiagonalParameter(self.n, 1.0, device=self.device)
+        n = observations.shape[1]
+        self.a = DiagonalParameter(n, 1.0 - constants.INITIAL_DECAY, device=self.device)
+        self.b = DiagonalParameter(n, constants.INITIAL_DECAY, device=self.device)
+        self.c = DiagonalParameter(n, 1.0, device=self.device)
+        self.d = DiagonalParameter(n, 1.0, device=self.device)
         self.sample_mean = torch.mean(observations, dim=0)
 
     def set_parameters(self, **kwargs: Any) -> None:
@@ -196,17 +192,11 @@ class ARMAMeanModel(MeanModel):
                 "only and only one dimension that's consistent"
             )
 
-        self.n = a.shape[0]
-        if isinstance(self.n, int):
-            self.a = DiagonalParameter(self.n)
-            self.b = DiagonalParameter(self.n)
-            self.c = DiagonalParameter(self.n)
-            self.d = DiagonalParameter(self.n)
-
-            self.a.set(a)
-            self.b.set(b)
-            self.c.set(c)
-            self.d.set(d)
+        n = a.shape[0]
+        self.a = DiagonalParameter(n).set(a)
+        self.b = DiagonalParameter(n).set(b)
+        self.c = DiagonalParameter(n).set(c)
+        self.d = DiagonalParameter(n).set(d)
 
         self.sample_mean = sample_mean
 
@@ -217,13 +207,12 @@ class ARMAMeanModel(MeanModel):
             "b": safe_value(self.b),
             "c": safe_value(self.c),
             "d": safe_value(self.d),
-            "n": self.n,
             "sample_mean": self.sample_mean,
         }
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         if self.a is None or self.b is None or self.c is None or self.d is None:
-            raise ValueError("ARMAMeanModel parameters have not been initialized")
+            raise RuntimeError("ARMAMeanModel parameters have not been initialized")
         return [self.a.value, self.b.value, self.c.value, self.d.value]
 
     def log_parameters(self):
@@ -252,7 +241,7 @@ class ARMAMeanModel(MeanModel):
             observations: torch.Tensor of dimension (n_obs, n_symbols)
                           of observations
             sample: bool - Run the model in 'sampling' mode, in which
-                           case `observations` are scaled zero-mean noise
+                           case `observations` are scaled, zero-mean noise
                            rather than actual observations.
             initial_mean: torch.Tensor (or something convertible to one)
                           Initial mean vector if specified
@@ -262,7 +251,7 @@ class ARMAMeanModel(MeanModel):
 
         """
         if self.a is None or self.b is None or self.c is None or self.d is None:
-            raise Exception("Mean model has not been fit()")
+            raise RuntimeError("Mean model has not been fit()")
 
         if mean_initial_value:
             if not isinstance(mean_initial_value, torch.Tensor):
@@ -297,7 +286,7 @@ class ARMAMeanModel(MeanModel):
         return mu, mu_t
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     zmm = ZeroMeanModel()
 
     amm = ARMAMeanModel()

@@ -44,6 +44,8 @@ def test_studentt_distribution():
     distribution.log_parameters()
 
     for df in (10, 20):
+        distribution.set_device(None)  # For coverage only
+
         # Make sure set_parameters() can be called with a `df` keyword
         distribution.set_parameters(df=df)
 
