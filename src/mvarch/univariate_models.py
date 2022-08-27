@@ -9,7 +9,7 @@ import torch
 # Local modules
 from . import constants
 from .distributions import Distribution, NormalDistribution
-from .mean_models import MeanModel, ZeroMeanModel, ARMAMeanModel
+from .mean_models import MeanModel, ZeroMeanModel
 from .parameters import (
     Parameter,
     DiagonalParameter,

@@ -3,7 +3,7 @@ import pytest
 import torch
 
 # Local modules
-from mvarch.mean_models import MeanModel, ZeroMeanModel, ARMAMeanModel
+from mvarch.mean_models import ZeroMeanModel, ARMAMeanModel
 
 EPS = 1e-6
 
@@ -106,9 +106,9 @@ def test_ARMA_mean_model():
     # Check that certain methods fail before parameters have been initialized
 
     with pytest.raises(RuntimeError):
-        optimizable_parameters = mean_model.get_optimizable_parameters()
+        mean_model.get_optimizable_parameters()
     with pytest.raises(RuntimeError):
-        means, next_mean = mean_model._predict(observations, sample=False)
+        mean_model._predict(observations, sample=False)
 
     mean_model.log_parameters()
 
@@ -156,3 +156,5 @@ def test_ARMA_mean_model():
 
     with pytest.raises(ValueError):
         mean_model.set_parameters(**ARMA_INVALID_PARAMETERS)
+
+    print("Done")
