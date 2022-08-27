@@ -2,8 +2,7 @@ from __future__ import annotations
 
 # Standard Python
 from abc import abstractmethod
-import logging
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Optional, Protocol
 from enum import Enum
 
 # Common packages
@@ -50,6 +49,7 @@ class ScalarParameter(Parameter):
     def __init__(
         self, n: int, scale: float = 1.0, device: Optional[torch.device] = None
     ):
+        super().__init__(n, scale, device)
         self.device = device
         self.value = torch.tensor(scale, device=device)
         self.value.requires_grad = True
@@ -67,6 +67,7 @@ class DiagonalParameter(Parameter):
     def __init__(
         self, n: int, scale: float = 1.0, device: Optional[torch.device] = None
     ):
+        super().__init__(n, scale, device)
         self.device = device
         self.value = scale * torch.ones(n, device=device)
         self.value.requires_grad = True
@@ -98,6 +99,7 @@ class TriangularParameter(Parameter):
     def __init__(
         self, n: int, scale: float = 1.0, device: Optional[torch.device] = None
     ):
+        super().__init__(n, scale, device)
         self.device = device
         self.value = scale * torch.eye(n, device=device)
         self.value.requires_grad = True
@@ -128,6 +130,7 @@ class FullParameter(Parameter):
     def __init__(
         self, n: int, scale: float = 1.0, device: Optional[torch.device] = None
     ):
+        super().__init__(n, scale, device)
         self.device = device
         self.value = scale * torch.eye(n, device=device)
         self.value.requires_grad = True

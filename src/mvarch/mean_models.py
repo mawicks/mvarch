@@ -10,10 +10,7 @@ import torch
 from . import constants
 from .parameters import (
     Parameter,
-    ScalarParameter,
     DiagonalParameter,
-    TriangularParameter,
-    FullParameter,
 )
 
 
