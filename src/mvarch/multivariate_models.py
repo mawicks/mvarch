@@ -1,13 +1,13 @@
 # Standard Python
 import logging
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 # Common packages
 import torch
 
 # Local modules
 from . import constants
-from .distributions import Distribution, NormalDistribution, StudentTDistribution
+
 from .parameters import (
     ParameterConstraint,
     Parameter,
@@ -20,7 +20,6 @@ from .parameters import (
 from .univariate_models import (
     UnivariateScalingModel,
     UnivariateUnitScalingModel,
-    UnivariateARCHModel,
 )
 from .matrix_ops import make_diagonal_nonnegative
 from .optimize import optimize
@@ -114,8 +113,6 @@ class MultivariateARCHModel:
 
         self.n = self.a = self.b = self.c = self.d = None
 
-        # The use of setattr here is to keep mypy happy.  It doeesn't like assigning
-        # to attributes hinted as Callable.  It interprets them to be bound methods.
         if constraint == ParameterConstraint.SCALAR:
             self.parameter_type = ScalarParameter
         elif constraint == ParameterConstraint.DIAGONAL:

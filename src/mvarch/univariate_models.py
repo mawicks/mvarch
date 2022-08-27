@@ -1,21 +1,18 @@
 # Standard Python
 from abc import abstractmethod
 import logging
-from typing import Any, Dict, List, Optional, Protocol, Tuple, Union
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 # Common packages
 import torch
 
 # Local modules
 from . import constants
-from .distributions import Distribution, NormalDistribution, StudentTDistribution
+from .distributions import Distribution, NormalDistribution
 from .mean_models import MeanModel, ZeroMeanModel, ARMAMeanModel
 from .parameters import (
     Parameter,
-    ScalarParameter,
     DiagonalParameter,
-    TriangularParameter,
-    FullParameter,
 )
 from .optimize import optimize
 
