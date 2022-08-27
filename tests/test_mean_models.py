@@ -156,3 +156,5 @@ def test_ARMA_mean_model():
 
     with pytest.raises(ValueError):
         mean_model.set_parameters(**ARMA_INVALID_PARAMETERS)
+
+    print("Done")
