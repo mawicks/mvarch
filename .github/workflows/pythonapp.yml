@@ -54,5 +54,5 @@ jobs:
           source .venv/bin/activate
           mypy src/mvarch
           coverage run -m pytest tests
-	  coverage report -m
+          coverage report -m
 
