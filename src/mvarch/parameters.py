@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Standard Python
 from abc import abstractmethod
 import logging
@@ -26,10 +28,10 @@ class Parameter(Protocol):
         """Abstract method with no implementation."""
 
     @abstractmethod
-    def _validate_value(self, value: torch.Tensor) -> None:
+    def _validate_value(self, value: torch.Tensor) -> Parameter:
         """Abstract method with no implementation."""
 
-    def set(self, value: Any) -> None:
+    def set(self, value: Any) -> Parameter:
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(
                 value, device=self.device, dtype=torch.float, requires_grad=True
@@ -37,6 +39,7 @@ class Parameter(Protocol):
 
         self._validate_value(value)
         self.value = value
+        return self
 
     @abstractmethod
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
@@ -51,9 +54,10 @@ class ScalarParameter(Parameter):
         self.value = torch.tensor(scale, device=device)
         self.value.requires_grad = True
 
-    def _validate_value(self, value: torch.Tensor) -> None:
+    def _validate_value(self, value: torch.Tensor) -> ScalarParameter:
         if len(value.shape) != 0:
             raise ValueError(f"Value isn't a scalar: {value}")
+        return self
 
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
         return self.value * other
@@ -67,9 +71,10 @@ class DiagonalParameter(Parameter):
         self.value = scale * torch.ones(n, device=device)
         self.value.requires_grad = True
 
-    def _validate_value(self, value: torch.Tensor) -> None:
+    def _validate_value(self, value: torch.Tensor) -> DiagonalParameter:
         if len(value.shape) != 1:
             raise ValueError(f"Value isn't a vector: {value}")
+        return self
 
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
         try:
@@ -97,12 +102,13 @@ class TriangularParameter(Parameter):
         self.value = scale * torch.eye(n, device=device)
         self.value.requires_grad = True
 
-    def _validate_value(self, value: torch.Tensor) -> None:
+    def _validate_value(self, value: torch.Tensor) -> TriangularParameter:
         if len(value.shape) != 2 or value.shape[0] != value.shape[1]:
             raise ValueError(f"Value isn't a square matrix: {value}")
 
         if not matrix_ops.is_lower_triangular(value):
             raise ValueError(f"Value isn't lower triangular: {value}")
+        return self
 
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
         # self.value was initialized to be triangular, so the
@@ -126,9 +132,10 @@ class FullParameter(Parameter):
         self.value = scale * torch.eye(n, device=device)
         self.value.requires_grad = True
 
-    def _validate_value(self, value: torch.Tensor) -> None:
+    def _validate_value(self, value: torch.Tensor) -> FullParameter:
         if len(value.shape) != 2 or value.shape[0] != value.shape[1]:
             raise ValueError(f"Value isn't a square matrix: {value}")
+        return self
 
     def __matmul__(self, other: torch.Tensor) -> torch.Tensor:
         try:

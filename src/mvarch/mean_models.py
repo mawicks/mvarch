@@ -193,16 +193,10 @@ class ARMAMeanModel(MeanModel):
             )
 
         n = a.shape[0]
-        if isinstance(n, int):
-            self.a = DiagonalParameter(n)
-            self.b = DiagonalParameter(n)
-            self.c = DiagonalParameter(n)
-            self.d = DiagonalParameter(n)
-
-            self.a.set(a)
-            self.b.set(b)
-            self.c.set(c)
-            self.d.set(d)
+        self.a = DiagonalParameter(n).set(a)
+        self.b = DiagonalParameter(n).set(b)
+        self.c = DiagonalParameter(n).set(c)
+        self.d = DiagonalParameter(n).set(d)
 
         self.sample_mean = sample_mean
 
@@ -247,7 +241,7 @@ class ARMAMeanModel(MeanModel):
             observations: torch.Tensor of dimension (n_obs, n_symbols)
                           of observations
             sample: bool - Run the model in 'sampling' mode, in which
-                           case `observations` are scaled zero-mean noise
+                           case `observations` are scaled, zero-mean noise
                            rather than actual observations.
             initial_mean: torch.Tensor (or something convertible to one)
                           Initial mean vector if specified
