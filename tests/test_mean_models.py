@@ -3,14 +3,14 @@ import pytest
 import torch
 
 # Local modules
-from mvarch.mean_models import MeanModel, ZeroMeanModel, ARMAMeanModel
+from mvarch.mean_models import ZeroMeanModel, ConstantMeanModel, ARMAMeanModel
 
 EPS = 1e-6
 
 
 def test_zero_mean_model():
     observations = torch.randn((10, 3))
-    noise = torch.randn((10, 3))
+    noise = torch.randn(observations.shape)
 
     mean_model = ZeroMeanModel()
     mean_model.initialize_parameters(observations)
@@ -34,6 +34,54 @@ def test_zero_mean_model():
     means, next_mean = mean_model._predict(observations, sample=True)
     assert torch.all(means == 0.0)
     assert torch.all(next_mean == 0.0)
+
+    # Calling sample() on a mean model isn't allowed.
+    with pytest.raises(Exception):
+        mean_model.sample(noise, initial_mean=None)
+
+    mean_model.log_parameters()
+
+
+CONSTANT_MEAN_VALUE = [0.001, 0.002, 0.003]
+
+
+def test_constant_mean_model():
+    constant_mean_value = torch.tensor(CONSTANT_MEAN_VALUE)
+    observations = torch.randn((10, 3))
+    noise = torch.randn(observations.shape)
+    expanded_constant_mean_value = constant_mean_value.unsqueeze(0).expand(
+        observations.shape
+    )
+
+    mean_model = ConstantMeanModel()
+
+    with pytest.raises(RuntimeError):
+        mean_model.get_optimizable_parameters()
+
+    with pytest.raises(RuntimeError):
+        mean_model._predict(observations, sample=False)
+
+    mean_model.initialize_parameters(observations)
+
+    parameters = mean_model.get_parameters()
+    assert len(parameters) == 1
+
+    mean_model.set_parameters(mu=CONSTANT_MEAN_VALUE)
+
+    optimizable_parameters = mean_model.get_optimizable_parameters()
+    assert len(optimizable_parameters) == 1
+
+    means, next_mean = mean_model.predict(observations)
+    assert torch.all(means == expanded_constant_mean_value)
+    assert torch.all(next_mean == constant_mean_value)
+
+    means, next_mean = mean_model._predict(observations, sample=False)
+    assert torch.all(means == expanded_constant_mean_value)
+    assert torch.all(next_mean == constant_mean_value)
+
+    means, next_mean = mean_model._predict(observations, sample=True)
+    assert torch.all(means == expanded_constant_mean_value)
+    assert torch.all(next_mean == constant_mean_value)
 
     # Calling sample() on a mean model isn't allowed.
     with pytest.raises(Exception):
