@@ -143,14 +143,16 @@ class ConstantMeanModel(MeanModel):
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
         n = observations.shape[1]
-        self.value = torch.zeros(
+        self.mu = torch.zeros(
             n, dtype=torch.float, device=self.device, requires_grad=True
         )
 
     def set_parameters(self, **kwargs: Any) -> None:
         mu = kwargs["mu"]
         if not isinstance(mu, torch.Tensor):
-            mu = torch.tensor(mu)
+            mu = torch.tensor(
+                mu, dtype=torch.float, device=self.device, requires_grad=True
+            )
         self.mu = mu
 
     def get_parameters(self) -> Dict[str, Any]:
@@ -229,13 +231,21 @@ class ARMAMeanModel(MeanModel):
         sample_mean = kwargs["sample_mean"]
 
         if not isinstance(a, torch.Tensor):
-            a = torch.tensor(a, dtype=torch.float, device=self.device)
+            a = torch.tensor(
+                a, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(b, torch.Tensor):
-            b = torch.tensor(b, dtype=torch.float, device=self.device)
+            b = torch.tensor(
+                b, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(c, torch.Tensor):
-            c = torch.tensor(c, dtype=torch.float, device=self.device)
+            c = torch.tensor(
+                c, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(d, torch.Tensor):
-            d = torch.tensor(d, dtype=torch.float, device=self.device)
+            d = torch.tensor(
+                d, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(sample_mean, torch.Tensor):
             sample_mean = torch.tensor(
                 sample_mean, dtype=torch.float, device=self.device

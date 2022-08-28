@@ -8,20 +8,42 @@ from mvarch.mean_models import ZeroMeanModel, ConstantMeanModel, ARMAMeanModel
 EPS = 1e-6
 
 
+def set_and_check_parameters(mean_model, observations, parameters, number, opt_number):
+    """
+    Given a freshly constructed model, test that the parameters pass basic tests
+    right after the default initialize_parameters() as well as after being set
+    to specific values by the client.
+    """
+    # Make sure we can get the full set of parameters and that they are optimizable
+    # and loggable.
+
+    def test_parameters():
+        parameters = mean_model.get_parameters()
+        assert len(parameters) == number
+
+        optimizable_parameters = mean_model.get_optimizable_parameters()
+        assert len(optimizable_parameters) == opt_number
+        for p in optimizable_parameters:
+            assert p.requires_grad == True
+
+        mean_model.log_parameters()
+
+    # Attempt to initialize the parmaters to default values, then test them.
+    mean_model.initialize_parameters(observations)
+    test_parameters()
+
+    # Attempt to initialize the parmaters to user-specified value, then test them.
+    mean_model.set_parameters(**parameters)
+    test_parameters()
+
+
 def test_zero_mean_model():
     observations = torch.randn((10, 3))
     noise = torch.randn(observations.shape)
 
     mean_model = ZeroMeanModel()
-    mean_model.initialize_parameters(observations)
 
-    parameters = mean_model.get_parameters()
-    assert len(parameters) == 0
-
-    mean_model.set_parameters(**{})
-
-    optimizable_parameters = mean_model.get_optimizable_parameters()
-    assert len(optimizable_parameters) == 0
+    set_and_check_parameters(mean_model, observations, {}, 0, 0)
 
     means, next_mean = mean_model.predict(observations)
     assert torch.all(means == 0.0)
@@ -42,11 +64,11 @@ def test_zero_mean_model():
     mean_model.log_parameters()
 
 
-CONSTANT_MEAN_VALUE = [0.001, 0.002, 0.003]
+CONSTANT_MEAN_VALUE = {"mu": [0.001, 0.002, 0.003]}
 
 
 def test_constant_mean_model():
-    constant_mean_value = torch.tensor(CONSTANT_MEAN_VALUE)
+    constant_mean_value = torch.tensor(CONSTANT_MEAN_VALUE["mu"])
     observations = torch.randn((10, 3))
     noise = torch.randn(observations.shape)
     expanded_constant_mean_value = constant_mean_value.unsqueeze(0).expand(
@@ -61,15 +83,7 @@ def test_constant_mean_model():
     with pytest.raises(RuntimeError):
         mean_model._predict(observations, sample=False)
 
-    mean_model.initialize_parameters(observations)
-
-    parameters = mean_model.get_parameters()
-    assert len(parameters) == 1
-
-    mean_model.set_parameters(mu=CONSTANT_MEAN_VALUE)
-
-    optimizable_parameters = mean_model.get_optimizable_parameters()
-    assert len(optimizable_parameters) == 1
+    set_and_check_parameters(mean_model, observations, CONSTANT_MEAN_VALUE, 1, 1)
 
     means, next_mean = mean_model.predict(observations)
     assert torch.all(means == expanded_constant_mean_value)
@@ -158,22 +172,7 @@ def test_ARMA_mean_model():
     with pytest.raises(RuntimeError):
         mean_model._predict(observations, sample=False)
 
-    mean_model.log_parameters()
-
-    # Initialize the parameters test get_optimizable_parameters() and _predict() again
-
-    mean_model.initialize_parameters(observations)
-    mean_model.log_parameters()
-
-    initialized_parameters = mean_model.get_parameters()
-    assert len(initialized_parameters) == 5
-
-    optimizable_parameters = mean_model.get_optimizable_parameters()
-    assert len(optimizable_parameters) == 4
-
-    # Set known parameter values and execute some test cases.
-
-    mean_model.set_parameters(**ARMA_GOOD_PARAMETERS)
+    set_and_check_parameters(mean_model, observations, ARMA_GOOD_PARAMETERS, 5, 4)
 
     # CASE 1: Specified parameters, specified input, and specified initial value.
 
