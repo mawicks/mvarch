@@ -4,11 +4,10 @@ import torch
 
 # Local modules
 from mvarch.mean_models import ZeroMeanModel, ConstantMeanModel, ARMAMeanModel
+from .utils import tensors_about_equal
 
-EPS = 1e-6
 
-
-def set_and_check_parameters(mean_model, observations, parameters, number, opt_number):
+def set_and_check_parameters(model, observations, parameters, number, opt_number):
     """
     Given a freshly constructed model, test that the parameters pass basic tests
     right after the default initialize_parameters() as well as after being set
@@ -18,27 +17,45 @@ def set_and_check_parameters(mean_model, observations, parameters, number, opt_n
     # and loggable.
 
     def test_parameters():
-        parameters = mean_model.get_parameters()
+        parameters = model.get_parameters()
         assert len(parameters) == number
 
-        optimizable_parameters = mean_model.get_optimizable_parameters()
+        optimizable_parameters = model.get_optimizable_parameters()
         assert len(optimizable_parameters) == opt_number
         for p in optimizable_parameters:
             assert p.requires_grad == True
 
-        mean_model.log_parameters()
+        model.log_parameters()
 
     # Attempt to log before parameter values are set (this should work
     # without raising an exception)
-    mean_model.log_parameters()
+    model.log_parameters()
 
     # Attempt to initialize the parmaters to default values, then test them.
-    mean_model.initialize_parameters(observations)
+    model.initialize_parameters(observations)
     test_parameters()
 
     # Attempt to initialize the parmaters to user-specified value, then test them.
-    mean_model.set_parameters(**parameters)
+    model.set_parameters(**parameters)
     test_parameters()
+
+
+def check_constant_prediction(model, observations, constant_mean_value):
+    expanded_constant_mean_value = constant_mean_value.unsqueeze(0).expand(
+        observations.shape
+    )
+
+    means, next_mean = model.predict(observations)
+    assert torch.all(means == expanded_constant_mean_value)
+    assert torch.all(next_mean == constant_mean_value)
+
+    means, next_mean = model._predict(observations, sample=False)
+    assert torch.all(means == expanded_constant_mean_value)
+    assert torch.all(next_mean == constant_mean_value)
+
+    means, next_mean = model._predict(observations, sample=True)
+    assert torch.all(means == expanded_constant_mean_value)
+    assert torch.all(next_mean == constant_mean_value)
 
 
 def test_zero_mean_model():
@@ -49,17 +66,9 @@ def test_zero_mean_model():
 
     set_and_check_parameters(mean_model, observations, {}, 0, 0)
 
-    means, next_mean = mean_model.predict(observations)
-    assert torch.all(means == 0.0)
-    assert torch.all(next_mean == 0.0)
-
-    means, next_mean = mean_model._predict(observations, sample=False)
-    assert torch.all(means == 0.0)
-    assert torch.all(next_mean == 0.0)
-
-    means, next_mean = mean_model._predict(observations, sample=True)
-    assert torch.all(means == 0.0)
-    assert torch.all(next_mean == 0.0)
+    check_constant_prediction(
+        mean_model, observations, torch.zeros(observations.shape[1])
+    )
 
     # Calling sample() on a mean model isn't allowed.
     with pytest.raises(Exception):
@@ -75,9 +84,6 @@ def test_constant_mean_model():
     constant_mean_value = torch.tensor(CONSTANT_MEAN_VALUE["mu"])
     observations = torch.randn((10, 3))
     noise = torch.randn(observations.shape)
-    expanded_constant_mean_value = constant_mean_value.unsqueeze(0).expand(
-        observations.shape
-    )
 
     mean_model = ConstantMeanModel()
 
@@ -89,17 +95,7 @@ def test_constant_mean_model():
 
     set_and_check_parameters(mean_model, observations, CONSTANT_MEAN_VALUE, 1, 1)
 
-    means, next_mean = mean_model.predict(observations)
-    assert torch.all(means == expanded_constant_mean_value)
-    assert torch.all(next_mean == constant_mean_value)
-
-    means, next_mean = mean_model._predict(observations, sample=False)
-    assert torch.all(means == expanded_constant_mean_value)
-    assert torch.all(next_mean == constant_mean_value)
-
-    means, next_mean = mean_model._predict(observations, sample=True)
-    assert torch.all(means == expanded_constant_mean_value)
-    assert torch.all(next_mean == constant_mean_value)
+    check_constant_prediction(mean_model, observations, constant_mean_value)
 
     # Calling sample() on a mean model isn't allowed.
     with pytest.raises(Exception):
@@ -144,14 +140,6 @@ ARMA_INVALID_PARAMETERS = {
     "d": [2.0, 2.0],
     "sample_mean": [0.001, -0.002, 0.003],
 }
-
-
-def tensors_about_equal(t1, t2, eps=EPS):
-    result = torch.norm(t1 - t2) < EPS * torch.norm(t1 + t2)
-    if not result:
-        print("first tensor:\n", t1)
-        print("second tensor:\n", t2)
-    return result
 
 
 def test_ARMA_mean_model():
