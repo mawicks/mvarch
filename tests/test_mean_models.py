@@ -28,6 +28,10 @@ def set_and_check_parameters(mean_model, observations, parameters, number, opt_n
 
         mean_model.log_parameters()
 
+    # Attempt to log before parameter values are set (this should work
+    # without raising an exception)
+    mean_model.log_parameters()
+
     # Attempt to initialize the parmaters to default values, then test them.
     mean_model.initialize_parameters(observations)
     test_parameters()
