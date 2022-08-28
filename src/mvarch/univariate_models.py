@@ -297,6 +297,8 @@ class UnivariateARCHModel(UnivariateScalingModel):
     d: Optional[Parameter]
     sample_scale: Optional[torch.Tensor]
 
+    n: Optional[int]
+
     def __init__(
         self,
         distribution: Distribution = NormalDistribution(),
@@ -317,6 +319,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         self.c = DiagonalParameter(n, 1.0, device=self.device)
         self.d = DiagonalParameter(n, 1.0, device=self.device)
         self.sample_scale = torch.std(observations, dim=0)
+        self.n = n
 
     def set_parameters(self, **kwargs: Any) -> None:
         a = kwargs["a"]
@@ -368,6 +371,8 @@ class UnivariateARCHModel(UnivariateScalingModel):
 
         self.sample_scale = sample_scale
 
+        self.n = n
+
     def get_parameters(self) -> Dict[str, Any]:
         safe_value = lambda x: x.value if x is not None else None
         return {
@@ -385,7 +390,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         return [self.a.value, self.b.value, self.c.value, self.d.value]
 
     def log_parameters(self) -> None:
-        if self.a and self.b and self.c and self.d:
+        if self.a and self.b and self.c and self.d and self.sample_scale is not None:
             logging.info(
                 "Univariate variance model\n"
                 f"a: {self.a.value.detach().numpy()}, "
