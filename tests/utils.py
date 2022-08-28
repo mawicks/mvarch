@@ -27,6 +27,7 @@ def set_and_check_parameters(model, observations, parameters, number, opt_number
         optimizable_parameters = model.get_optimizable_parameters()
         assert len(optimizable_parameters) == opt_number
         for p in optimizable_parameters:
+            print(p)
             assert p.requires_grad == True
 
         model.log_parameters()

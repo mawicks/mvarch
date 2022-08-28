@@ -295,7 +295,6 @@ class UnivariateARCHModel(UnivariateScalingModel):
     b: Optional[Parameter]
     c: Optional[Parameter]
     d: Optional[Parameter]
-    n: Optional[int]
     sample_scale: Optional[torch.Tensor]
 
     def __init__(
@@ -304,7 +303,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         device: Optional[torch.device] = None,
         mean_model: MeanModel = ZeroMeanModel(),
     ):
-        self.n = self.a = self.b = self.c = self.d = None
+        self.a = self.b = self.c = self.d = None
         self.sample_scale = None
         self.distribution = distribution
         self.distribution.set_device(device)
@@ -312,13 +311,11 @@ class UnivariateARCHModel(UnivariateScalingModel):
         self.mean_model = mean_model
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        self.n = observations.shape[1]
-        self.a = DiagonalParameter(
-            self.n, 1.0 - constants.INITIAL_DECAY, device=self.device
-        )
-        self.b = DiagonalParameter(self.n, constants.INITIAL_DECAY, device=self.device)
-        self.c = DiagonalParameter(self.n, 1.0, device=self.device)
-        self.d = DiagonalParameter(self.n, 1.0, device=self.device)
+        n = observations.shape[1]
+        self.a = DiagonalParameter(n, 1.0 - constants.INITIAL_DECAY, device=self.device)
+        self.b = DiagonalParameter(n, constants.INITIAL_DECAY, device=self.device)
+        self.c = DiagonalParameter(n, 1.0, device=self.device)
+        self.d = DiagonalParameter(n, 1.0, device=self.device)
         self.sample_scale = torch.std(observations, dim=0)
 
     def set_parameters(self, **kwargs: Any) -> None:
@@ -326,19 +323,27 @@ class UnivariateARCHModel(UnivariateScalingModel):
         b = kwargs["b"]
         c = kwargs["c"]
         d = kwargs["d"]
-        initial_std = kwargs["initial_std"]
+        sample_scale = kwargs["sample_scale"]
 
         if not isinstance(a, torch.Tensor):
-            a = torch.tensor(a, dtype=torch.float, device=self.device)
+            a = torch.tensor(
+                a, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(b, torch.Tensor):
-            b = torch.tensor(b, dtype=torch.float, device=self.device)
+            b = torch.tensor(
+                b, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(c, torch.Tensor):
-            c = torch.tensor(c, dtype=torch.float, device=self.device)
+            c = torch.tensor(
+                c, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(d, torch.Tensor):
-            d = torch.tensor(d, dtype=torch.float, device=self.device)
-        if not isinstance(initial_std, torch.Tensor):
-            initial_std = torch.tensor(
-                initial_std, dtype=torch.float, device=self.device
+            d = torch.tensor(
+                d, dtype=torch.float, device=self.device, requires_grad=True
+            )
+        if not isinstance(sample_scale, torch.Tensor):
+            sample_scale = torch.tensor(
+                sample_scale, dtype=torch.float, device=self.device
             )
 
         if (
@@ -346,28 +351,22 @@ class UnivariateARCHModel(UnivariateScalingModel):
             or a.shape != b.shape
             or a.shape != c.shape
             or a.shape != d.shape
-            or a.shape != initial_std.shape
+            or a.shape != sample_scale.shape
         ):
             raise ValueError(
                 f"The shapes of a({a.shape}), b({b.shape}), "
                 f"c({c.shape}), d({d.shape}), and "
-                f"initial_std({initial_std.shape}) must have "
+                f"sample_scale({sample_scale.shape}) must have "
                 "only and only one dimension that's consistent"
             )
 
-        self.n = a.shape[0]
-        if self.n is not None:
-            self.a = DiagonalParameter(self.n)
-            self.b = DiagonalParameter(self.n)
-            self.c = DiagonalParameter(self.n)
-            self.d = DiagonalParameter(self.n)
+        n = a.shape[0]
+        self.a = DiagonalParameter(n).set(a)
+        self.b = DiagonalParameter(n).set(b)
+        self.c = DiagonalParameter(n).set(c)
+        self.d = DiagonalParameter(n).set(d)
 
-            self.a.set(a)
-            self.b.set(b)
-            self.c.set(c)
-            self.d.set(d)
-
-        self.sample_scale = initial_std
+        self.sample_scale = sample_scale
 
     def get_parameters(self) -> Dict[str, Any]:
         safe_value = lambda x: x.value if x is not None else None
@@ -376,7 +375,6 @@ class UnivariateARCHModel(UnivariateScalingModel):
             "b": safe_value(self.b),
             "c": safe_value(self.c),
             "d": safe_value(self.d),
-            "n": self.n,
             "sample_scale": self.sample_scale,
         }
 
@@ -387,7 +385,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         return [self.a.value, self.b.value, self.c.value, self.d.value]
 
     def log_parameters(self) -> None:
-        if self.a and self.b and self.c and self.d and self.sample_scale:
+        if self.a and self.b and self.c and self.d:
             logging.info(
                 "Univariate variance model\n"
                 f"a: {self.a.value.detach().numpy()}, "
@@ -480,7 +478,7 @@ if __name__ == "__main__":
     univariate_model = UnivariateARCHModel()
 
     univariate_model.set_parameters(
-        a=[0.90], b=[0.33], c=[0.25], d=[1.0], initial_std=[0.01]
+        a=[0.90], b=[0.33], c=[0.25], d=[1.0], sample_scale=[0.01]
     )
     uv_x, uv_sigma = univariate_model.sample(10000, [0.01])[:2]
     univariate_model.fit(uv_x)

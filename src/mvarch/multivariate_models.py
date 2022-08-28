@@ -132,13 +132,21 @@ class MultivariateARCHModel:
 
     def set_parameters(self, a: Any, b: Any, c: Any, d: Any, sample_scale: Any) -> None:
         if not isinstance(a, torch.Tensor):
-            a = torch.tensor(a, dtype=torch.float, device=self.device)
+            a = torch.tensor(
+                a, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(b, torch.Tensor):
-            b = torch.tensor(b, dtype=torch.float, device=self.device)
+            b = torch.tensor(
+                b, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(c, torch.Tensor):
-            c = torch.tensor(c, dtype=torch.float, device=self.device)
+            c = torch.tensor(
+                c, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(d, torch.Tensor):
-            d = torch.tensor(d, dtype=torch.float, device=self.device)
+            d = torch.tensor(
+                d, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(sample_scale, torch.Tensor):
             sample_scale = torch.tensor(
                 sample_scale, dtype=torch.float, device=self.device
