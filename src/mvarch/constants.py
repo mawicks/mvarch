@@ -1,3 +1,9 @@
+"""
+Global Constants:
+
+DEBUG, PROGRESS_ITERATIONS, LEARNING_RATE, INITIAL_DECAY, MAX_CLAMP, MIN_CLAMP, and EPS
+"""
+
 DEBUG = False
 
 # Maximum number of optimization iterations to

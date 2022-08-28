@@ -1,13 +1,13 @@
 # Standard Python
 import logging
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 # Common packages
 import torch
 
 # Local modules
 from . import constants
-from .distributions import Distribution, NormalDistribution, StudentTDistribution
+
 from .parameters import (
     ParameterConstraint,
     Parameter,
@@ -20,7 +20,6 @@ from .parameters import (
 from .univariate_models import (
     UnivariateScalingModel,
     UnivariateUnitScalingModel,
-    UnivariateARCHModel,
 )
 from .matrix_ops import make_diagonal_nonnegative
 from .optimize import optimize
@@ -39,15 +38,15 @@ def joint_conditional_log_likelihood(
            transformation is a lower-triangular matrix and the outcome is presumed
            to be z = transformation @ e where the elements of e are iid from distrbution.
        distribution: torch.distributions.Distribution or other object with a log_prob() method.
-           Note we assume distrubution was constructed with center=0 and shape=1.  Any normalizing and recentering
-           is achieved by explicit`transformations` here.
+           Note we assume distrubution was constructed with center=0 and shape=1
+           Any normalizing and recentering is achieved by explicit`transformations` here.
        uv_scale: torch.Tensor of shape (n_obj, n_symbols) or None.
-              When uv_scale is specified, the observed variables
-              are related to the innovations by x = diag(sigma) T e.
-              This is when the estimator for the transformation
-              from e to x is factored into a diagonal scaling
-              matrix (sigma) and a correlating transformation T.
-              When sigma is not specified any scaling is already embedded in T.
+           When uv_scale is specified, the observed variables
+           are related to the innovations by x = diag(sigma) T e.
+           This is when the estimator for the transformation
+           from e to x is factored into a diagonal scaling
+           matrix (sigma) and a correlating transformation T.
+           When sigma is not specified any scaling is already embedded in T.
 
 
     Returns:
@@ -114,8 +113,6 @@ class MultivariateARCHModel:
 
         self.n = self.a = self.b = self.c = self.d = None
 
-        # The use of setattr here is to keep mypy happy.  It doeesn't like assigning
-        # to attributes hinted as Callable.  It interprets them to be bound methods.
         if constraint == ParameterConstraint.SCALAR:
             self.parameter_type = ScalarParameter
         elif constraint == ParameterConstraint.DIAGONAL:
@@ -263,7 +260,7 @@ class MultivariateARCHModel:
             print(f"self.sample_scale: {self.sample_scale}")
         scale_sequence = []
 
-        for k, obs in enumerate(observations):
+        for obs in observations:
             # Store the current ht before predicting next one
             scale_sequence.append(scale_t)
 
@@ -281,7 +278,8 @@ class MultivariateARCHModel:
             b_o = (self.b @ obs).unsqueeze(1)
             c_sample_scale = self.c @ self.sample_scale
 
-            # The covariance is a_ht @ a_ht.T + b_o @ b_o.T + (c @ sample_scale) @ (c @ sample_scale).T
+            # The covariance is
+            # a_ht @ a_ht.T + b_o @ b_o.T + (c @ sample_scale) @ (c @ sample_scale).T
             # Unnecessary squaring is discouraged for nunerical stability.
             # Instead, we use only square roots and never explicity
             # compute the covariance.  This is a common 'trick' achieved
@@ -304,8 +302,9 @@ class MultivariateARCHModel:
         centered_observations: torch.Tensor,
         uv_scale: torch.Tensor,
     ) -> torch.Tensor:
-        """
-        This computes the mean per-sample log likelihood (the total log likelihood divided by the number of samples).
+        """This computes the mean per-sample log likelihood (the total log
+        likelihood divided by the number of samples).
+
         """
         # We pass uv_scale into this function rather than computing it
         # here because __mean_log_likelihood() is called in a training
@@ -333,9 +332,10 @@ class MultivariateARCHModel:
 
     @torch.no_grad()
     def mean_log_likelihood(self, observations: torch.Tensor) -> float:
-        """
-        This is the inference version of mean_log_likelihood(), which is the version clients would normally use.
-        It computes the mean per-sample log likelihood (the total log likelihood divided by the number of samples).
+        """This is the inference version of mean_log_likelihood(), which is
+        the version clients would normally use.  It computes the mean
+        per-sample log likelihood (the total log likelihood divided by
+        the number of samples).
 
         Arguments:
             observations: torch.Tensor of shape (n_obs, n_symbols)
