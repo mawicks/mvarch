@@ -4,40 +4,7 @@ import torch
 
 # Local modules
 from mvarch.mean_models import ZeroMeanModel, ConstantMeanModel, ARMAMeanModel
-from .utils import tensors_about_equal
-
-
-def set_and_check_parameters(model, observations, parameters, number, opt_number):
-    """
-    Given a freshly constructed model, test that the parameters pass basic tests
-    right after the default initialize_parameters() as well as after being set
-    to specific values by the client.
-    """
-    # Make sure we can get the full set of parameters and that they are optimizable
-    # and loggable.
-
-    def test_parameters():
-        parameters = model.get_parameters()
-        assert len(parameters) == number
-
-        optimizable_parameters = model.get_optimizable_parameters()
-        assert len(optimizable_parameters) == opt_number
-        for p in optimizable_parameters:
-            assert p.requires_grad == True
-
-        model.log_parameters()
-
-    # Attempt to log before parameter values are set (this should work
-    # without raising an exception)
-    model.log_parameters()
-
-    # Attempt to initialize the parmaters to default values, then test them.
-    model.initialize_parameters(observations)
-    test_parameters()
-
-    # Attempt to initialize the parmaters to user-specified value, then test them.
-    model.set_parameters(**parameters)
-    test_parameters()
+from . import utils
 
 
 def check_constant_prediction(model, observations, constant_mean_value):
@@ -64,7 +31,7 @@ def test_zero_mean_model():
 
     mean_model = ZeroMeanModel()
 
-    set_and_check_parameters(mean_model, observations, {}, 0, 0)
+    utils.set_and_check_parameters(mean_model, observations, {}, 0, 0)
 
     check_constant_prediction(
         mean_model, observations, torch.zeros(observations.shape[1])
@@ -93,7 +60,7 @@ def test_constant_mean_model():
     with pytest.raises(RuntimeError):
         mean_model._predict(observations, sample=False)
 
-    set_and_check_parameters(mean_model, observations, CONSTANT_MEAN_VALUE, 1, 1)
+    utils.set_and_check_parameters(mean_model, observations, CONSTANT_MEAN_VALUE, 1, 1)
 
     check_constant_prediction(mean_model, observations, constant_mean_value)
 
@@ -164,15 +131,15 @@ def test_ARMA_mean_model():
     with pytest.raises(RuntimeError):
         mean_model._predict(observations, sample=False)
 
-    set_and_check_parameters(mean_model, observations, ARMA_GOOD_PARAMETERS, 5, 4)
+    utils.set_and_check_parameters(mean_model, observations, ARMA_GOOD_PARAMETERS, 5, 4)
 
     # CASE 1: Specified parameters, specified input, and specified initial value.
 
     means, next_mean = mean_model._predict(
         observations, sample=False, mean_initial_value=ARMA_MEAN_INITIAL_VALUE
     )
-    assert tensors_about_equal(means, predicted_means)
-    assert tensors_about_equal(next_mean, next_predicted_mean)
+    assert utils.tensors_about_equal(means, predicted_means)
+    assert utils.tensors_about_equal(next_mean, next_predicted_mean)
 
     # CASE 2: Same but use default initial value.  We only check that
     # the initial value was used.
@@ -186,8 +153,8 @@ def test_ARMA_mean_model():
     means, next_mean = mean_model._predict(
         observations, sample=True, mean_initial_value=ARMA_MEAN_INITIAL_VALUE
     )
-    assert tensors_about_equal(means, sample_predicted_means)
-    assert tensors_about_equal(next_mean, sample_next_predicted_mean)
+    assert utils.tensors_about_equal(means, sample_predicted_means)
+    assert utils.tensors_about_equal(next_mean, sample_next_predicted_mean)
 
     # Calling sample() on a mean model isn't allowed.
     with pytest.raises(Exception):
