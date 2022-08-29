@@ -156,7 +156,7 @@ class ConstantMeanModel(MeanModel):
         self.mu = mu
 
     def get_parameters(self) -> Dict[str, Any]:
-        return {"mu": self.mu}
+        return {"mu": self.mu.detach().numpy() if self.mu is not None else None}
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         if self.mu is None:
@@ -274,13 +274,15 @@ class ARMAMeanModel(MeanModel):
         self.sample_mean = sample_mean
 
     def get_parameters(self) -> Dict[str, Any]:
-        safe_value = lambda x: x.value if x is not None else None
+        safe_value = lambda x: x.value.detach().numpy() if x is not None else None
         return {
             "a": safe_value(self.a),
             "b": safe_value(self.b),
             "c": safe_value(self.c),
             "d": safe_value(self.d),
-            "sample_mean": self.sample_mean,
+            "sample_mean": self.sample_mean.detach().numpy()
+            if self.sample_mean is not None
+            else None,
         }
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:

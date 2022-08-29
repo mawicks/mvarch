@@ -372,7 +372,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         self.n = n
 
     def get_parameters(self) -> Dict[str, Any]:
-        safe_value = lambda x: x.value if x is not None else None
+        safe_value = lambda x: x.value.detach().numpy() if x is not None else None
         return {
             "a": safe_value(self.a),
             "b": safe_value(self.b),

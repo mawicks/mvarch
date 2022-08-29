@@ -225,7 +225,7 @@ def test_arch_fit():
     variance.
     """
     CONSTANT_SCALE = 0.25
-    CONSTANT_MEAN = 0.1
+    CONSTANT_MEAN = 0.5
     SAMPLE_SIZE = 2500
     TOLERANCE = 0.075
 
@@ -243,9 +243,14 @@ def test_arch_fit():
 
     model = UnivariateARCHModel(mean_model=ARMAMeanModel())
     model.fit(random_observations)
+
+    print("mean model parameters: ", model.mean_model.get_parameters())
+    print("scale model parameters: ", model.get_parameters())
+
     scale_next, mean_next = model.predict(random_observations)[2:]
-    print("scale prediction: ", scale_next)
+
     print("mean prediction: ", mean_next)
+    print("scale prediction: ", scale_next)
 
     assert abs(scale_next - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
     assert abs(mean_next - CONSTANT_MEAN) < TOLERANCE * abs(CONSTANT_MEAN)
