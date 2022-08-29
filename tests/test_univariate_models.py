@@ -225,6 +225,7 @@ def test_arch_fit():
     variance.
     """
     CONSTANT_SCALE = 0.25
+    CONSTANT_MEAN = 0.1
     SAMPLE_SIZE = 2500
     TOLERANCE = 0.075
 
@@ -234,18 +235,20 @@ def test_arch_fit():
     random_observations = torch.randn((SAMPLE_SIZE, 1))
 
     # The sample variance is random.  Scale the sample so that the
-    # sample standard deviation is *exactly* what we expect the model
-    # to predict.
+    # sample standard deviation and the sample mean are *exactly* what
+    # we expect the model to predict.
     random_observations = (
-        random_observations / torch.std(random_observations) * CONSTANT_SCALE
-    )
+        random_observations - torch.mean(random_observations)
+    ) / torch.std(random_observations) * CONSTANT_SCALE + CONSTANT_MEAN
 
-    model = UnivariateARCHModel()
+    model = UnivariateARCHModel(mean_model=ARMAMeanModel())
     model.fit(random_observations)
-
-    scale_next = model.predict(random_observations)[2]
+    scale_next, mean_next = model.predict(random_observations)[2:]
+    print("scale prediction: ", scale_next)
+    print("mean prediction: ", mean_next)
 
     assert abs(scale_next - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
+    assert abs(mean_next - CONSTANT_MEAN) < TOLERANCE * abs(CONSTANT_MEAN)
 
     # Make sure that sample(int) returns something reasonable
     sample_std = float(torch.std(model.sample(SAMPLE_SIZE)[0]))
