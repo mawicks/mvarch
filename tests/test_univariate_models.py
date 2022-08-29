@@ -225,7 +225,7 @@ def test_arch_fit():
     variance.
     """
     CONSTANT_SCALE = 0.25
-    SAMPLE_SIZE = 500
+    SAMPLE_SIZE = 2500
     TOLERANCE = 0.10
 
     # The tolerance hasn't been chosen very scientifically.  The sample size
