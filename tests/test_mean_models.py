@@ -3,37 +3,39 @@ import pytest
 import torch
 
 # Local modules
-from mvarch.mean_models import ZeroMeanModel, ARMAMeanModel
+from mvarch.mean_models import ZeroMeanModel, ConstantMeanModel, ARMAMeanModel
+from . import utils
 
-EPS = 1e-6
+
+def check_constant_prediction(model, observations, constant_mean_value):
+    expanded_constant_mean_value = constant_mean_value.unsqueeze(0).expand(
+        observations.shape
+    )
+
+    means, next_mean = model.predict(observations)
+    assert torch.all(means == expanded_constant_mean_value)
+    assert torch.all(next_mean == constant_mean_value)
+
+    means, next_mean = model._predict(observations, sample=False)
+    assert torch.all(means == expanded_constant_mean_value)
+    assert torch.all(next_mean == constant_mean_value)
+
+    means, next_mean = model._predict(observations, sample=True)
+    assert torch.all(means == expanded_constant_mean_value)
+    assert torch.all(next_mean == constant_mean_value)
 
 
 def test_zero_mean_model():
     observations = torch.randn((10, 3))
-    noise = torch.randn((10, 3))
+    noise = torch.randn(observations.shape)
 
     mean_model = ZeroMeanModel()
-    mean_model.initialize_parameters(observations)
 
-    parameters = mean_model.get_parameters()
-    assert len(parameters) == 0
+    utils.set_and_check_parameters(mean_model, observations, {}, 0, 0)
 
-    mean_model.set_parameters(**{})
-
-    optimizable_parameters = mean_model.get_optimizable_parameters()
-    assert len(optimizable_parameters) == 0
-
-    means, next_mean = mean_model.predict(observations)
-    assert torch.all(means == 0.0)
-    assert torch.all(next_mean == 0.0)
-
-    means, next_mean = mean_model._predict(observations, sample=False)
-    assert torch.all(means == 0.0)
-    assert torch.all(next_mean == 0.0)
-
-    means, next_mean = mean_model._predict(observations, sample=True)
-    assert torch.all(means == 0.0)
-    assert torch.all(next_mean == 0.0)
+    check_constant_prediction(
+        mean_model, observations, torch.zeros(observations.shape[1])
+    )
 
     # Calling sample() on a mean model isn't allowed.
     with pytest.raises(Exception):
@@ -42,7 +44,34 @@ def test_zero_mean_model():
     mean_model.log_parameters()
 
 
-ARMA_GOOD_PARAMETERS = {
+CONSTANT_MEAN_VALUE = {"mu": [0.001, 0.002, 0.003]}
+
+
+def test_constant_mean_model():
+    constant_mean_value = torch.tensor(CONSTANT_MEAN_VALUE["mu"])
+    observations = torch.randn((10, 3))
+    noise = torch.randn(observations.shape)
+
+    mean_model = ConstantMeanModel()
+
+    with pytest.raises(RuntimeError):
+        mean_model.get_optimizable_parameters()
+
+    with pytest.raises(RuntimeError):
+        mean_model._predict(observations, sample=False)
+
+    utils.set_and_check_parameters(mean_model, observations, CONSTANT_MEAN_VALUE, 1, 1)
+
+    check_constant_prediction(mean_model, observations, constant_mean_value)
+
+    # Calling sample() on a mean model isn't allowed.
+    with pytest.raises(Exception):
+        mean_model.sample(noise, initial_mean=None)
+
+    mean_model.log_parameters()
+
+
+ARMA_VALID_PARAMETERS = {
     "a": [0.8, 0.7],
     "b": [0.1, 0.2],
     "c": [0.03, 0.07],
@@ -80,21 +109,13 @@ ARMA_INVALID_PARAMETERS = {
 }
 
 
-def tensors_about_equal(t1, t2, eps=EPS):
-    result = torch.norm(t1 - t2) < EPS * torch.norm(t1 + t2)
-    if not result:
-        print("first tensor:\n", t1)
-        print("second tensor:\n", t2)
-    return result
-
-
 def test_ARMA_mean_model():
     default_initial_value = torch.tensor(DEFAULT_INITIAL_VALUE)
     observations = torch.tensor(ARMA_OBSERVATIONS)
     # For now, also use observations as the nois einput when sample=True.
     noise = observations
 
-    # For goo parameters with `default_initial_value` and
+    # For valid parameters with `default_initial_value` and
     # `observations`, These are the expected outputs below
     predicted_means = torch.tensor(PREDICTED_MEANS)
     next_predicted_mean = torch.tensor(NEXT_PREDICTED_MEAN)
@@ -110,30 +131,17 @@ def test_ARMA_mean_model():
     with pytest.raises(RuntimeError):
         mean_model._predict(observations, sample=False)
 
-    mean_model.log_parameters()
-
-    # Initialize the parameters test get_optimizable_parameters() and _predict() again
-
-    mean_model.initialize_parameters(observations)
-    mean_model.log_parameters()
-
-    initialized_parameters = mean_model.get_parameters()
-    assert len(initialized_parameters) == 5
-
-    optimizable_parameters = mean_model.get_optimizable_parameters()
-    assert len(optimizable_parameters) == 4
-
-    # Set known parameter values and execute some test cases.
-
-    mean_model.set_parameters(**ARMA_GOOD_PARAMETERS)
+    utils.set_and_check_parameters(
+        mean_model, observations, ARMA_VALID_PARAMETERS, 5, 4
+    )
 
     # CASE 1: Specified parameters, specified input, and specified initial value.
 
     means, next_mean = mean_model._predict(
         observations, sample=False, mean_initial_value=ARMA_MEAN_INITIAL_VALUE
     )
-    assert tensors_about_equal(means, predicted_means)
-    assert tensors_about_equal(next_mean, next_predicted_mean)
+    assert utils.tensors_about_equal(means, predicted_means)
+    assert utils.tensors_about_equal(next_mean, next_predicted_mean)
 
     # CASE 2: Same but use default initial value.  We only check that
     # the initial value was used.
@@ -147,8 +155,8 @@ def test_ARMA_mean_model():
     means, next_mean = mean_model._predict(
         observations, sample=True, mean_initial_value=ARMA_MEAN_INITIAL_VALUE
     )
-    assert tensors_about_equal(means, sample_predicted_means)
-    assert tensors_about_equal(next_mean, sample_next_predicted_mean)
+    assert utils.tensors_about_equal(means, sample_predicted_means)
+    assert utils.tensors_about_equal(next_mean, sample_next_predicted_mean)
 
     # Calling sample() on a mean model isn't allowed.
     with pytest.raises(Exception):

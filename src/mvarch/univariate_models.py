@@ -18,22 +18,24 @@ from .optimize import optimize
 
 
 def marginal_conditional_log_likelihood(
-    observations: torch.Tensor,
+    centered_observations: torch.Tensor,
     scale: torch.Tensor,
     distribution: torch.distributions.Distribution,
 ) -> torch.Tensor:
     """
     Arguments:
-       observations: torch.Tensor of shape (n_obs, n_symbols)
+       centered_observations: torch.Tensor of shape (n_obs, n_symbols)
        scale: torch.Tensor of shape (n_obs, n_symbols)
            Contains the estimated univariate (marginal) standard deviation for each observation.
-       distribution: torch.distributions.distribution.Distribution instance which should have a log_prob() method.
-           Note we assume distrubution was constructed with center=0 and shape=1.  Any normalizing and recentering
-           is achieved by explicit`transformations` here.
+       distribution: torch.distributions.distribution.Distribution instance
+            which should have a log_prob() method.
+
+       Note we assume distrubution was constructed with center=0 and shape=1.
+       Any normalizing and recentering is achieved by explicit`transformations` here.
 
     Returns the mean log_likelihood"""
 
-    scaled_observations = observations / scale
+    scaled_observations = centered_observations / scale
     logging.debug(f"scaled_observations: \n{scaled_observations}")
 
     # Compute the log likelihoods on the innovations
@@ -55,19 +57,19 @@ class UnivariateScalingModel(Protocol):
 
     @abstractmethod
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def set_parameters(self, **kwargs) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_parameters(self) -> Dict[str, Any]:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def log_parameters(self) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
@@ -76,7 +78,6 @@ class UnivariateScalingModel(Protocol):
         Returns a list of parameters that can be used in a
          `torch.optim.Optimizer` constructor.
         """
-        raise NotImplementedError
 
     @abstractmethod
     def _predict(
@@ -101,7 +102,6 @@ class UnivariateScalingModel(Protocol):
             scale_next: torch.Tensor scale prediction for next unobserved value
 
         """
-        raise NotImplementedError
 
     def fit(self, observations: torch.Tensor) -> None:
         self.distribution.log_parameters()
@@ -125,7 +125,7 @@ class UnivariateScalingModel(Protocol):
             )
 
             def loss_closure() -> float:
-                if constants.DEBUG:
+                if constants.DEBUG:  # pragma: no cover
                     self.log_parameters()
                 optim.zero_grad()
                 loss = -self.__mean_log_likelihood(observations)
@@ -155,8 +155,9 @@ class UnivariateScalingModel(Protocol):
         return scale, mu, scale_next, mu_next
 
     def __mean_log_likelihood(self, observations: torch.Tensor) -> torch.Tensor:
-        """
-        Compute and return the mean (per-sample) log likelihood (the total log likelihood divided by the number of samples).
+        """Compute and return the mean (per-sample) log likelihood (the total
+        log likelihood divided by the number of samples).
+
         """
         mu = self.mean_model._predict(observations)[0]
         centered_observations = observations - mu
@@ -168,9 +169,11 @@ class UnivariateScalingModel(Protocol):
 
     @torch.no_grad()
     def mean_log_likelihood(self, observations: torch.Tensor) -> float:
-        """
-        This is the inference version of mean_log_likelihood(), which is the version clients would normally use.
-        It computes the mean per-sample log likelihood (the total log likelihood divided by the number of samples).
+        """This is the inference version of mean_log_likelihood(), which is
+        the version clients would normally use.  It computes the mean
+        per-sample log likelihood (the total log likelihood divided by
+        the number of samples).
+
         """
         return float(self.__mean_log_likelihood(observations))
 
@@ -279,10 +282,10 @@ class UnivariateUnitScalingModel(UnivariateScalingModel):
         scale = torch.ones(
             centered_observations.shape, dtype=torch.float, device=self.device
         )
-        scale_next = torch.ones(
+        next_scale = torch.ones(
             centered_observations.shape[1], dtype=torch.float, device=self.device
         )
-        return scale, scale_next
+        return scale, next_scale
 
 
 class UnivariateARCHModel(UnivariateScalingModel):
@@ -290,8 +293,9 @@ class UnivariateARCHModel(UnivariateScalingModel):
     b: Optional[Parameter]
     c: Optional[Parameter]
     d: Optional[Parameter]
-    n: Optional[int]
     sample_scale: Optional[torch.Tensor]
+
+    n: Optional[int]
 
     def __init__(
         self,
@@ -299,7 +303,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         device: Optional[torch.device] = None,
         mean_model: MeanModel = ZeroMeanModel(),
     ):
-        self.n = self.a = self.b = self.c = self.d = None
+        self.a = self.b = self.c = self.d = None
         self.sample_scale = None
         self.distribution = distribution
         self.distribution.set_device(device)
@@ -307,33 +311,40 @@ class UnivariateARCHModel(UnivariateScalingModel):
         self.mean_model = mean_model
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        self.n = observations.shape[1]
-        self.a = DiagonalParameter(
-            self.n, 1.0 - constants.INITIAL_DECAY, device=self.device
-        )
-        self.b = DiagonalParameter(self.n, constants.INITIAL_DECAY, device=self.device)
-        self.c = DiagonalParameter(self.n, 1.0, device=self.device)
-        self.d = DiagonalParameter(self.n, 1.0, device=self.device)
+        n = observations.shape[1]
+        self.a = DiagonalParameter(n, 1.0 - constants.INITIAL_DECAY, device=self.device)
+        self.b = DiagonalParameter(n, constants.INITIAL_DECAY, device=self.device)
+        self.c = DiagonalParameter(n, 1.0, device=self.device)
+        self.d = DiagonalParameter(n, 1.0, device=self.device)
         self.sample_scale = torch.std(observations, dim=0)
+        self.n = n
 
     def set_parameters(self, **kwargs: Any) -> None:
         a = kwargs["a"]
         b = kwargs["b"]
         c = kwargs["c"]
         d = kwargs["d"]
-        initial_std = kwargs["initial_std"]
+        sample_scale = kwargs["sample_scale"]
 
         if not isinstance(a, torch.Tensor):
-            a = torch.tensor(a, dtype=torch.float, device=self.device)
+            a = torch.tensor(
+                a, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(b, torch.Tensor):
-            b = torch.tensor(b, dtype=torch.float, device=self.device)
+            b = torch.tensor(
+                b, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(c, torch.Tensor):
-            c = torch.tensor(c, dtype=torch.float, device=self.device)
+            c = torch.tensor(
+                c, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(d, torch.Tensor):
-            d = torch.tensor(d, dtype=torch.float, device=self.device)
-        if not isinstance(initial_std, torch.Tensor):
-            initial_std = torch.tensor(
-                initial_std, dtype=torch.float, device=self.device
+            d = torch.tensor(
+                d, dtype=torch.float, device=self.device, requires_grad=True
+            )
+        if not isinstance(sample_scale, torch.Tensor):
+            sample_scale = torch.tensor(
+                sample_scale, dtype=torch.float, device=self.device
             )
 
         if (
@@ -341,28 +352,24 @@ class UnivariateARCHModel(UnivariateScalingModel):
             or a.shape != b.shape
             or a.shape != c.shape
             or a.shape != d.shape
-            or a.shape != initial_std.shape
+            or a.shape != sample_scale.shape
         ):
             raise ValueError(
                 f"The shapes of a({a.shape}), b({b.shape}), "
                 f"c({c.shape}), d({d.shape}), and "
-                f"initial_std({initial_std.shape}) must have "
+                f"sample_scale({sample_scale.shape}) must have "
                 "only and only one dimension that's consistent"
             )
 
-        self.n = a.shape[0]
-        if self.n is not None:
-            self.a = DiagonalParameter(self.n)
-            self.b = DiagonalParameter(self.n)
-            self.c = DiagonalParameter(self.n)
-            self.d = DiagonalParameter(self.n)
+        n = a.shape[0]
+        self.a = DiagonalParameter(n).set(a)
+        self.b = DiagonalParameter(n).set(b)
+        self.c = DiagonalParameter(n).set(c)
+        self.d = DiagonalParameter(n).set(d)
 
-            self.a.set(a)
-            self.b.set(b)
-            self.c.set(c)
-            self.d.set(d)
+        self.sample_scale = sample_scale
 
-        self.sample_scale = initial_std
+        self.n = n
 
     def get_parameters(self) -> Dict[str, Any]:
         safe_value = lambda x: x.value if x is not None else None
@@ -371,7 +378,6 @@ class UnivariateARCHModel(UnivariateScalingModel):
             "b": safe_value(self.b),
             "c": safe_value(self.c),
             "d": safe_value(self.d),
-            "n": self.n,
             "sample_scale": self.sample_scale,
         }
 
@@ -382,7 +388,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         return [self.a.value, self.b.value, self.c.value, self.d.value]
 
     def log_parameters(self) -> None:
-        if self.a and self.b and self.c and self.d and self.sample_scale:
+        if self.a and self.b and self.c and self.d and self.sample_scale is not None:
             logging.info(
                 "Univariate variance model\n"
                 f"a: {self.a.value.detach().numpy()}, "
@@ -413,11 +419,11 @@ class UnivariateARCHModel(UnivariateScalingModel):
             scale_initial_value: torch.Tensor - Initial value for scale.
         Returns:
             scale: torch.Tensor of predictions for each observation
-            scale_next: torch.Tensor prediction for next unobserved value
+            next_scale: torch.Tensor prediction for next unobserved value
 
         """
         if self.a is None or self.b is None or self.c is None or self.d is None:
-            raise Exception("Model has not been fit()")
+            raise RuntimeError("Model has not been fit()")
 
         if scale_initial_value:
             if not isinstance(scale_initial_value, torch.Tensor):
@@ -434,7 +440,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         scale_t = torch.maximum(scale_t, torch.tensor(float(constants.EPS)))
         scale_sequence = []
 
-        for k, obs in enumerate(centered_observations):
+        for obs in centered_observations:
             # Store the current ht before predicting next one
             scale_sequence.append(scale_t)
 
@@ -465,7 +471,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         return scale, scale_t
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s:%(message)s",
@@ -475,7 +481,18 @@ if __name__ == "__main__":
     univariate_model = UnivariateARCHModel()
 
     univariate_model.set_parameters(
-        a=[0.90], b=[0.33], c=[0.25], d=[1.0], initial_std=[0.01]
+        a=[0.80], b=[0.33], c=[0.5], d=[1.0], sample_scale=[0.0025]
     )
-    uv_x, uv_sigma = univariate_model.sample(10000, [0.01])[:2]
-    univariate_model.fit(uv_x)
+
+    # uv_x, uv_sigma = univariate_model.sample(50000, [0.01])[:2]
+    # univariate_model.fit(uv_x)
+
+    random_x = torch.randn((500, 1))
+    random_x = random_x / torch.std(random_x) * 0.25
+    univariate_model.fit(random_x)
+    scale, _, scale_next = univariate_model.predict(random_x)[:3]
+    print(scale[:10])
+    print("...")
+    print(scale[-10:])
+
+    print(f"prediction: {scale_next}")

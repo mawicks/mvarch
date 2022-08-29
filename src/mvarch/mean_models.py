@@ -1,7 +1,7 @@
 # Standard Python
 from abc import abstractmethod
 import logging
-from typing import Any, Dict, List, Protocol, Tuple, Union
+from typing import Any, Dict, List, Optional, Protocol, Tuple, Union
 
 # Common packages
 import torch
@@ -73,7 +73,7 @@ class MeanModel(Protocol):
     def sample(
         self,
         scaled_zero_mean_noise: torch.Tensor,
-        initial_mean: Union[torch.Tensor, None],
+        initial_mean: Optional[torch.Tensor],
     ) -> torch.Tensor:
         # mu = self.__predict(scaled_zero_mean_noise, sample=True, initial_mean=initial_mean)
         # return mu
@@ -83,12 +83,12 @@ class MeanModel(Protocol):
 class ZeroMeanModel(MeanModel):
     def __init__(
         self,
-        device: Union[torch.device, None] = None,
+        device: Optional[torch.device] = None,
     ):
         self.device = device
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        self.n = observations.shape[1]
+        pass
 
     def set_parameters(self, **kwargs: Any) -> None:
         pass
@@ -131,17 +131,85 @@ class ZeroMeanModel(MeanModel):
         return mu, mu_next
 
 
-class ARMAMeanModel(MeanModel):
-    a: Union[Parameter, None]
-    b: Union[Parameter, None]
-    c: Union[Parameter, None]
-    d: Union[Parameter, None]
-    sample_mean: Union[torch.Tensor, None]
-    device: Union[torch.device, None]
+class ConstantMeanModel(MeanModel):
+    mu: Optional[torch.Tensor]
 
     def __init__(
         self,
-        device: Union[torch.device, None] = None,
+        device: Optional[torch.device] = None,
+    ):
+        self.device = device
+        self.mu = None
+
+    def initialize_parameters(self, observations: torch.Tensor) -> None:
+        n = observations.shape[1]
+        self.mu = torch.zeros(
+            n, dtype=torch.float, device=self.device, requires_grad=True
+        )
+
+    def set_parameters(self, **kwargs: Any) -> None:
+        mu = kwargs["mu"]
+        if not isinstance(mu, torch.Tensor):
+            mu = torch.tensor(
+                mu, dtype=torch.float, device=self.device, requires_grad=True
+            )
+        self.mu = mu
+
+    def get_parameters(self) -> Dict[str, Any]:
+        return {"mu": self.mu}
+
+    def get_optimizable_parameters(self) -> List[torch.Tensor]:
+        if self.mu is None:
+            raise RuntimeError(
+                "Constant Mean Model parameters have not been initialized"
+            )
+        return [self.mu]
+
+    def log_parameters(self) -> None:
+        logging.info(f"Constant Mean Model: {self.mu}")
+
+    def _predict(
+        self,
+        observations: torch.Tensor,
+        sample: bool = False,
+        mean_initial_value: Union[torch.Tensor, Any, None] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Given a, b, c, d, and observations, generate the *estimated*
+        standard deviations (marginal) for each observation
+
+        Argument:
+            observations: torch.Tensor of dimension (n_obs, n_symbols)
+                          of observations
+            sample: bool - Run the model in 'sampling' mode, in which
+                           case `observations` are scaled zero-mean noise
+                           rather than actual observations.
+            mean_initial_value: torch.Tensor (or something convertible to one)
+                                Ignored for ConstantMeanModel
+        Returns:
+            mu: torch.Tensor of predictions for each observation
+            mu_next: torch.Tensor prediction for next unobserved value
+
+        """
+        if self.mu is None:
+            raise RuntimeError("Constant mean model has not been initialized)")
+
+        print(self.mu)
+        mu = self.mu.unsqueeze(0).expand(observations.shape)
+        mu_next = self.mu
+        return mu, mu_next
+
+
+class ARMAMeanModel(MeanModel):
+    a: Optional[Parameter]
+    b: Optional[Parameter]
+    c: Optional[Parameter]
+    d: Optional[Parameter]
+    sample_mean: Optional[torch.Tensor]
+    device: Optional[torch.device]
+
+    def __init__(
+        self,
+        device: Optional[torch.device] = None,
     ):
         self.a = self.b = self.c = self.d = None
         self.sample_mean = None
@@ -163,13 +231,21 @@ class ARMAMeanModel(MeanModel):
         sample_mean = kwargs["sample_mean"]
 
         if not isinstance(a, torch.Tensor):
-            a = torch.tensor(a, dtype=torch.float, device=self.device)
+            a = torch.tensor(
+                a, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(b, torch.Tensor):
-            b = torch.tensor(b, dtype=torch.float, device=self.device)
+            b = torch.tensor(
+                b, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(c, torch.Tensor):
-            c = torch.tensor(c, dtype=torch.float, device=self.device)
+            c = torch.tensor(
+                c, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(d, torch.Tensor):
-            d = torch.tensor(d, dtype=torch.float, device=self.device)
+            d = torch.tensor(
+                d, dtype=torch.float, device=self.device, requires_grad=True
+            )
         if not isinstance(sample_mean, torch.Tensor):
             sample_mean = torch.tensor(
                 sample_mean, dtype=torch.float, device=self.device
@@ -248,7 +324,7 @@ class ARMAMeanModel(MeanModel):
 
         """
         if self.a is None or self.b is None or self.c is None or self.d is None:
-            raise RuntimeError("Mean model has not been fit()")
+            raise RuntimeError("Mean model has not been initialized)")
 
         if mean_initial_value:
             if not isinstance(mean_initial_value, torch.Tensor):
@@ -261,7 +337,7 @@ class ARMAMeanModel(MeanModel):
 
         mu_sequence = []
 
-        for k, obs in enumerate(observations):
+        for obs in observations:
             # Store the current mu_t before predicting next one
             mu_sequence.append(mu_t)
 

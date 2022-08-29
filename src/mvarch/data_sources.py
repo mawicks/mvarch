@@ -1,3 +1,14 @@
+"""data_sources.py
+
+There are two:  YFinanceSource() or HugeStockMarketDatasetSource().
+
+HugeStockMarketDatasetSource() is a stock dataset available on Kaggle
+with no usage restrictions.  It requires downloading a large zip file
+and placing it in the current directory.
+
+"""
+
+
 import logging
 
 from typing import Callable, Dict, Iterable, Union
@@ -54,8 +65,9 @@ def YFinanceSource() -> DataSource:  # pragma: no cover
         response = {}
 
         for symbol in symbols:
-            # The `group_by` option for yf.download() behaves differently when there's only one symbol.
-            # Always return a dictionary of dataframes, even for one symbol.
+            # The `group_by` option for yf.download() behaves
+            # differently when there's only one symbol.  Always return
+            # a dictionary of dataframes, even for one symbol.
             if len(symbols) > 1:
                 symbol_df = df[symbol]
             else:
