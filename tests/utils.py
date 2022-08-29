@@ -1,6 +1,6 @@
 import torch
 
-EPS = 1e-6
+EPS = 5e-6
 
 
 def tensors_about_equal(t1, t2, eps=EPS):

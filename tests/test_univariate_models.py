@@ -226,7 +226,7 @@ def test_arch_fit():
     """
     CONSTANT_SCALE = 0.25
     SAMPLE_SIZE = 2500
-    TOLERANCE = 0.10
+    TOLERANCE = 0.075
 
     # The tolerance hasn't been chosen very scientifically.  The sample size
     # is fairly small for a quick test so it won't be tight.
