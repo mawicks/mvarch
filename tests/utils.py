@@ -15,7 +15,8 @@ def set_and_check_parameters(model, observations, parameters, number, opt_number
     """
     Given a freshly constructed model, test that the parameters pass basic tests
     right after the default initialize_parameters() as well as after being set
-    to specific values by the client.
+    to specific values by the client.  When this functions returns, the model
+    parameters have been set to `parameters`
     """
     # Make sure we can get the full set of parameters and that they are optimizable
     # and loggable.
@@ -26,6 +27,7 @@ def set_and_check_parameters(model, observations, parameters, number, opt_number
 
         optimizable_parameters = model.get_optimizable_parameters()
         assert len(optimizable_parameters) == opt_number
+        print("optimizable parameters: ")
         for p in optimizable_parameters:
             print(p)
             assert p.requires_grad == True
@@ -36,10 +38,10 @@ def set_and_check_parameters(model, observations, parameters, number, opt_number
     # without raising an exception)
     model.log_parameters()
 
-    # Attempt to initialize the parmaters to default values, then test them.
+    # Attempt to initialize the parameters to default values, then test them.
     model.initialize_parameters(observations)
     test_parameters()
 
-    # Attempt to initialize the parmaters to user-specified value, then test them.
+    # Attempt to initialize the parameters to user-specified value, then test them.
     model.set_parameters(**parameters)
     test_parameters()

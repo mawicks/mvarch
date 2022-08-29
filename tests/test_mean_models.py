@@ -71,7 +71,7 @@ def test_constant_mean_model():
     mean_model.log_parameters()
 
 
-ARMA_GOOD_PARAMETERS = {
+ARMA_VALID_PARAMETERS = {
     "a": [0.8, 0.7],
     "b": [0.1, 0.2],
     "c": [0.03, 0.07],
@@ -115,7 +115,7 @@ def test_ARMA_mean_model():
     # For now, also use observations as the nois einput when sample=True.
     noise = observations
 
-    # For goo parameters with `default_initial_value` and
+    # For valid parameters with `default_initial_value` and
     # `observations`, These are the expected outputs below
     predicted_means = torch.tensor(PREDICTED_MEANS)
     next_predicted_mean = torch.tensor(NEXT_PREDICTED_MEAN)
@@ -131,7 +131,9 @@ def test_ARMA_mean_model():
     with pytest.raises(RuntimeError):
         mean_model._predict(observations, sample=False)
 
-    utils.set_and_check_parameters(mean_model, observations, ARMA_GOOD_PARAMETERS, 5, 4)
+    utils.set_and_check_parameters(
+        mean_model, observations, ARMA_VALID_PARAMETERS, 5, 4
+    )
 
     # CASE 1: Specified parameters, specified input, and specified initial value.
 

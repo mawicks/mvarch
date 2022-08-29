@@ -18,13 +18,13 @@ from .optimize import optimize
 
 
 def marginal_conditional_log_likelihood(
-    observations: torch.Tensor,
+    centered_observations: torch.Tensor,
     scale: torch.Tensor,
     distribution: torch.distributions.Distribution,
 ) -> torch.Tensor:
     """
     Arguments:
-       observations: torch.Tensor of shape (n_obs, n_symbols)
+       centered_observations: torch.Tensor of shape (n_obs, n_symbols)
        scale: torch.Tensor of shape (n_obs, n_symbols)
            Contains the estimated univariate (marginal) standard deviation for each observation.
        distribution: torch.distributions.distribution.Distribution instance
@@ -35,7 +35,7 @@ def marginal_conditional_log_likelihood(
 
     Returns the mean log_likelihood"""
 
-    scaled_observations = observations / scale
+    scaled_observations = centered_observations / scale
     logging.debug(f"scaled_observations: \n{scaled_observations}")
 
     # Compute the log likelihoods on the innovations
@@ -284,10 +284,10 @@ class UnivariateUnitScalingModel(UnivariateScalingModel):
         scale = torch.ones(
             centered_observations.shape, dtype=torch.float, device=self.device
         )
-        scale_next = torch.ones(
+        next_scale = torch.ones(
             centered_observations.shape[1], dtype=torch.float, device=self.device
         )
-        return scale, scale_next
+        return scale, next_scale
 
 
 class UnivariateARCHModel(UnivariateScalingModel):
@@ -421,11 +421,11 @@ class UnivariateARCHModel(UnivariateScalingModel):
             scale_initial_value: torch.Tensor - Initial value for scale.
         Returns:
             scale: torch.Tensor of predictions for each observation
-            scale_next: torch.Tensor prediction for next unobserved value
+            next_scale: torch.Tensor prediction for next unobserved value
 
         """
         if self.a is None or self.b is None or self.c is None or self.d is None:
-            raise Exception("Model has not been fit()")
+            raise RuntimeError("Model has not been fit()")
 
         if scale_initial_value:
             if not isinstance(scale_initial_value, torch.Tensor):
@@ -483,7 +483,8 @@ if __name__ == "__main__":
     univariate_model = UnivariateARCHModel()
 
     univariate_model.set_parameters(
-        a=[0.90], b=[0.33], c=[0.25], d=[1.0], sample_scale=[0.01]
+        a=[0.80], b=[0.33], c=[0.5], d=[1.0], sample_scale=[0.0025]
     )
-    uv_x, uv_sigma = univariate_model.sample(10000, [0.01])[:2]
+
+    uv_x, uv_sigma = univariate_model.sample(50000, [0.01])[:2]
     univariate_model.fit(uv_x)

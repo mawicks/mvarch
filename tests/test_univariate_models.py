@@ -1,59 +1,155 @@
 import pytest
 
+# Standard imports
+from math import sqrt
+
+import numpy as np
 import torch
 
 # Local modules
-from mvarch.univariate_models import UnivariateUnitScalingModel, UnivariateARCHModel
+from mvarch.univariate_models import (
+    marginal_conditional_log_likelihood,
+    UnivariateUnitScalingModel,
+    UnivariateARCHModel,
+)
+
 from . import utils
+
+
+def check_constant_prediction(
+    model, observations, constant_scale_value, constant_mean_value
+):
+    expanded_constant_scale_value = constant_scale_value.unsqueeze(0).expand(
+        observations.shape
+    )
+    expanded_constant_mean_value = constant_mean_value.unsqueeze(0).expand(
+        observations.shape
+    )
+
+    scale, _, next_scale, __ = model.predict(observations)
+    assert torch.all(scale == expanded_constant_scale_value)
+    assert torch.all(next_scale == constant_scale_value)
+
+    scale, next_scale = model._predict(observations, sample=False)
+    assert torch.all(scale == expanded_constant_scale_value)
+    assert torch.all(next_scale == constant_scale_value)
+
+    scale, next_scale = model._predict(observations, sample=True)
+    assert torch.all(scale == expanded_constant_scale_value)
+    assert torch.all(next_scale == constant_scale_value)
+
+    # Confirm that sample returns the original observations plus the mean model output
+    output = model.sample(observations)[0]
+    assert utils.tensors_about_equal(
+        output, observations + expanded_constant_mean_value
+    )
 
 
 def test_scaling_model():
     N = 3
-    observations = torch.randn((10, N))
-    noise = torch.randn(observations.shape)
+    observations = torch.randn((10, N), dtype=torch.float)
+    noise = torch.randn(observations.shape, dtype=torch.float)
     model = UnivariateUnitScalingModel()
 
     utils.set_and_check_parameters(model, observations, {"n": N}, 0, 0)
 
+    check_constant_prediction(
+        model,
+        observations,
+        torch.ones(observations.shape[1], dtype=torch.float),
+        torch.zeros(observations.shape[1], dtype=torch.float),
+    )
 
-ARCH_GOOD_PARAMETERS = {
-    "a": [0.8, 0.7],
-    "b": [0.1, 0.2],
-    "c": [0.03, 0.07],
-    "d": [2.0, 2.0],
-    "sample_scale": [0.001, -0.002],
+
+# These aren't realistic values.  They're just some nice whole numbers for testing.
+# We use a dimension of two with independent values because otherwise we wouldn't catch
+# transpose errors or stacking errors for example.
+ARCH_VALID_PARAMETERS = {
+    "a": [2, 3],
+    "b": [5, 7],
+    "c": [11, 13],
+    "d": [17, 19],
+    "sample_scale": [23, 29],
 }
-ARCH_SCALE_INITIAL_VALUE = [0.001, 0.002]
-DEFAULT_INITIAL_VALUE = [0.002, -0.004]  # This is d * sample_mean
-ARCH_OBSERVATIONS = [
-    [0.003, -0.005],
-    [0.0, 0.0],
-]
+CONSTANT_MEAN = 7
+ARCH_SCALE_INITIAL_VALUE = [31, 37]
+ARCH_CENTERED_OBSERVATIONS = [[39, 41], [0, 0]]
+ARCH_DEFAULT_INITIAL_VALUE = [391, 551]  # This is d * sample_scale
+
+# Here's what should happen:
+#    sigma0 = [31, 37] # Supplied initial value
+#    [a*sigma0, b*obs0,c*sample_scale]:
+#        [[62, 111], [195, 287], [253, 377]] -> sqrt([105878, 236819])
+#    This leads to sigma1 = sqrt([105878, 236819]) = [325.38..., 486.64...]
+#    Next iteration:
+#    [a*sigma1, b*obs1, c*sample_scale]:
+#       [[2*sqrt(105878), 3*sqrt(236819)], [0, 0], [253, 377]
+#    This leads to sigma2 = sqrt([487521, 2273500]) = [698.22..., 1507.81...]
+
+PREDICTED_SCALE = [[31, 37], [sqrt(105878), sqrt(236819)]]
+PREDICTED_SCALE_NEXT = [sqrt(487521), sqrt(2273500)]
+
+# When sample is set to one, the input is scaled by the predicted scale.
+#    sigma0 = [31, 37] # Supplied initial value
+#    [a*sigma0, b*(sigma0*obs0), c*sample_scale]:
+#        [[62, 111], [6045, 10619], [253, 377]] -> sqrt([36609878, 112917611])
+#    Next iteration:
+#         [[2*sqrt(36609878), 3*sqrt(112917611)], [0, 0], [253, 377]] -> sqrt([[146503521, 1016400628])
+
+SAMPLE_PREDICTED_SCALE = [[31, 37], [sqrt(36609878), sqrt(112917611)]]
+SAMPLE_PREDICTED_SCALE_NEXT = [sqrt(146503521), sqrt(1016400628)]
 
 
-def test_arch_odel():
-    default_initial_value = torch.tensor(DEFAULT_INITIAL_VALUE)
-    observations = torch.tensor(ARCH_OBSERVATIONS)
+def test_arch_model():
+    default_initial_value = torch.tensor(ARCH_DEFAULT_INITIAL_VALUE, dtype=torch.float)
+    observations = torch.tensor(ARCH_CENTERED_OBSERVATIONS, dtype=torch.float)
     # For now, also use observations as the nois einput when sample=True.
     noise = observations
 
     model = UnivariateARCHModel()
-    utils.set_and_check_parameters(model, observations, ARCH_GOOD_PARAMETERS, 5, 4)
+    with pytest.raises(RuntimeError):
+        model.sample(observations)
 
+    utils.set_and_check_parameters(model, observations, ARCH_VALID_PARAMETERS, 5, 4)
 
-# Here's what should happen:
-#    mu0 = [.001, 0.002]
-#    mu1 = a*initial_value + b*obs0 + c*sample_mean = [.00113, .0003]
-#    mu2 = a*mu1 + b*obs1 + c*sample_mean = [9.34e-4, 4.2e-5]
-PREDICTED_SCALE = [[0.001, 0.002], [0.00113, 0.00026]]
-NEXT_PREDICTED_SCALE = [9.34e-4, 4.2e-5]
+    # Case 1: _predict with sample=False and specified initial value
+    scale, scale_next = model._predict(
+        observations, scale_initial_value=ARCH_SCALE_INITIAL_VALUE
+    )
+    assert utils.tensors_about_equal(
+        scale, torch.tensor(PREDICTED_SCALE, dtype=torch.float)
+    )
+    assert utils.tensors_about_equal(
+        scale_next, torch.tensor(PREDICTED_SCALE_NEXT, dtype=torch.float)
+    )
+    print("_predict() with sample=False")
+    print("scale: ", scale)
+    print("scale**2: ", scale**2)
+    print("scale_next: ", scale_next)
+    print("scale_next**2: ", scale_next**2)
 
-# When sample is set to one, the predicted means get added to the input noise (which has zero mean)
-#    mu0 = [.001, 0.002]
-#    mu1 = a*initial_value + b*(obs0+mu0) + c*sample_mean = [.00123, .00066]
-#    mu2 = a*mu1 + b*(obs1+mu1) + c*sample_mean = [0.001137, 0.0004540]
-SAMPLE_PREDICTED_SCALE = [[0.001, 0.002], [0.00123, 0.00066]]
-SAMPLE_NEXT_PREDICTED_SCALE = [0.001137, 0.0004540]
+    # Case 2: _predict with sample=True and specified initial value
+    sample_scale, sample_scale_next = model._predict(
+        observations, sample=True, scale_initial_value=ARCH_SCALE_INITIAL_VALUE
+    )
+    assert utils.tensors_about_equal(
+        sample_scale, torch.tensor(SAMPLE_PREDICTED_SCALE, dtype=torch.float)
+    )
+    assert utils.tensors_about_equal(
+        sample_scale_next, torch.tensor(SAMPLE_PREDICTED_SCALE_NEXT, dtype=torch.float)
+    )
+    print("_predict() with sample=True")
+    print("sample_scale: ", sample_scale)
+    print("sample_scale**2: ", sample_scale**2)
+    print("sample_scale_next: ", sample_scale_next)
+    print("sample_scale_next**2: ", sample_scale_next**2)
+
+    # Case 3: _predict with sample=False and using default initial value.
+    scale, scale_next = model._predict(observations)
+    assert utils.tensors_about_equal(
+        scale[0, :], torch.tensor(ARCH_DEFAULT_INITIAL_VALUE)
+    )
+
 
 # Here's a set of parameters that are not valid because their dimensions do not conform
 ARCH_INVALID_PARAMETERS = {
@@ -63,3 +159,45 @@ ARCH_INVALID_PARAMETERS = {
     "d": [2.0, 2.0],
     "sample_mean": [0.001, -0.002, 0.003],
 }
+
+
+def test_marginal_likelihood():
+    """Test marginal_conditional_log_likelihood, which computes the log
+    probability for a number of different scales all at once.  Do the
+    equivalent calculation by looping over the scale and values and
+    constructing a distribution object for each specific scale parameter
+    before calling log_prob.  This should yield the same result
+    as marginal_conditional_log_likelhood()
+
+    """
+    # We'll use the normal distribution, but marginal_condition_log_likelihood
+    # should work for any distribution.
+    dist = torch.distributions.Normal
+
+    # General random scales, then generate standard normal variables and scale them.
+    scale = torch.abs(torch.randn(10, 3))
+    noise = scale * torch.randn(10, 3)
+
+    # Compute the log likelihood for the scaled variables using the
+    # correct scale in the distribution.  We sum likelihoods over
+    # columns and average over rows.
+    ll = []
+    for noise_row, scale_row in zip(noise, scale):
+        ll.append(
+            sum(
+                [
+                    dist(loc=0.0, scale=s).log_prob(n)
+                    for n, s in zip(noise_row, scale_row)
+                ]
+            )
+        )
+
+    expected = float(np.mean(ll))
+
+    actual = float(
+        marginal_conditional_log_likelihood(
+            noise, scale, distribution=dist(loc=0.0, scale=1.0)
+        )
+    )
+
+    assert abs(expected - actual) < utils.EPS * abs(expected)
