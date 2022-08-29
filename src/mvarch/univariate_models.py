@@ -57,19 +57,19 @@ class UnivariateScalingModel(Protocol):
 
     @abstractmethod
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def set_parameters(self, **kwargs) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_parameters(self) -> Dict[str, Any]:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def log_parameters(self) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
@@ -78,7 +78,6 @@ class UnivariateScalingModel(Protocol):
         Returns a list of parameters that can be used in a
          `torch.optim.Optimizer` constructor.
         """
-        raise NotImplementedError
 
     @abstractmethod
     def _predict(
@@ -103,7 +102,6 @@ class UnivariateScalingModel(Protocol):
             scale_next: torch.Tensor scale prediction for next unobserved value
 
         """
-        raise NotImplementedError
 
     def fit(self, observations: torch.Tensor) -> None:
         self.distribution.log_parameters()
