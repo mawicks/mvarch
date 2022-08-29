@@ -256,8 +256,14 @@ def test_arch_fit():
     assert abs(mean_next - CONSTANT_MEAN) < TOLERANCE * abs(CONSTANT_MEAN)
 
     # Make sure that sample(int) returns something reasonable
-    sample_std = float(torch.std(model.sample(SAMPLE_SIZE)[0]))
-    print("std sample: ", sample_std)
+    sample_output = model.sample(SAMPLE_SIZE)[0]
+    sample_mean = float(torch.mean(sample_output))
+    sample_std = float(torch.std(sample_output))
+
+    print("sample mean: ", sample_mean)
+    print("sample std: ", sample_std)
+
+    assert abs(sample_mean - CONSTANT_MEAN) < TOLERANCE * CONSTANT_MEAN
     assert abs(sample_std - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
 
     # Check that the log likelihoods being returned are reasonable
