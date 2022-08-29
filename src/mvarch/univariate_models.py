@@ -125,7 +125,7 @@ class UnivariateScalingModel(Protocol):
             )
 
             def loss_closure() -> float:
-                if constants.DEBUG:
+                if constants.DEBUG:  # pragma: no cover
                     self.log_parameters()
                 optim.zero_grad()
                 loss = -self.__mean_log_likelihood(observations)
@@ -471,7 +471,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         return scale, scale_t
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s:%(message)s",
@@ -484,5 +484,15 @@ if __name__ == "__main__":
         a=[0.80], b=[0.33], c=[0.5], d=[1.0], sample_scale=[0.0025]
     )
 
-    uv_x, uv_sigma = univariate_model.sample(50000, [0.01])[:2]
-    univariate_model.fit(uv_x)
+    # uv_x, uv_sigma = univariate_model.sample(50000, [0.01])[:2]
+    # univariate_model.fit(uv_x)
+
+    random_x = torch.randn((500, 1))
+    random_x = random_x / torch.std(random_x) * 0.25
+    univariate_model.fit(random_x)
+    scale, _, scale_next = univariate_model.predict(random_x)[:3]
+    print(scale[:10])
+    print("...")
+    print(scale[-10:])
+
+    print(f"prediction: {scale_next}")
