@@ -87,8 +87,8 @@ def joint_conditional_log_likelihood(
 
 
 class MultivariateARCHModel:
-    n: Optional[int]
     parameter_type: Type[Parameter]
+
     a: Optional[Parameter]
     b: Optional[Parameter]
     c: Optional[Parameter]
@@ -111,7 +111,7 @@ class MultivariateARCHModel:
         # There should be a better way to do this.  Maybe add a set_device method.
         self.univariate_model.device = device
 
-        self.n = self.a = self.b = self.c = self.d = None
+        self.a = self.b = self.c = self.d = None
 
         if constraint == ParameterConstraint.SCALAR:
             self.parameter_type = ScalarParameter
@@ -122,13 +122,20 @@ class MultivariateARCHModel:
         else:
             self.parameter_type = FullParameter
 
-    def initialize_parameters(self, n: int) -> None:
-        self.n = n
+    def initialize_parameters(
+        self, unscaled_centered_observations: torch.Tensor
+    ) -> None:
+        n = unscaled_centered_observations.shape[1]
         # Initialize a and b as simple multiples of the identity
         self.a = self.parameter_type(n, 1.0 - constants.INITIAL_DECAY, self.device)
         self.b = self.parameter_type(n, constants.INITIAL_DECAY, self.device)
         self.c = self.parameter_type(n, 0.01, self.device)
         self.d = self.parameter_type(n, 1.0, self.device)
+
+        self.sample_scale = self.transform_matrix(
+            unscaled_centered_observations.T
+            / torch.sqrt(torch.tensor(unscaled_centered_observations.shape[0]))
+        )
 
     def set_parameters(self, a: Any, b: Any, c: Any, d: Any, sample_scale: Any) -> None:
         if not isinstance(a, torch.Tensor):
@@ -151,30 +158,26 @@ class MultivariateARCHModel:
             sample_scale = torch.tensor(
                 sample_scale, dtype=torch.float, device=self.device
             )
+        if a.shape != b.shape or a.shape != c.shape or a.shape != d.shape:
+            raise ValueError(
+                f"There dimensions of a({a.shape}), b({b.shape}), "
+                f"c({c.shape}), and d({d.shape}) must agree."
+            )
         if (
-            len(a.shape) != 2
-            or a.shape != b.shape
-            or a.shape != c.shape
-            or a.shape != d.shape
-            or a.shape != sample_scale.shape
+            len(sample_scale.shape) != 2
+            or sample_scale.shape[0] != sample_scale.shape[1]
+            or (len(a.shape) >= 1 and a.shape[0] != sample_scale.shape[0])
         ):
             raise ValueError(
-                f"There must be two dimensions of a({a.shape}), b({b.shape}), "
-                f"c({c.shape}), d({d.shape}), and "
-                f"sample_scale({sample_scale.shape}) that all agree"
+                f"The shape of sample_scale ({sample_scale.shape}) must be square and must "
+                f"conform with parameter shapes ({a.shape})"
             )
 
-        self.n = a.shape[0]
-        if self.n is not None:
-            self.a = FullParameter(self.n)
-            self.b = FullParameter(self.n)
-            self.c = FullParameter(self.n)
-            self.d = FullParameter(self.n)
-
-            self.a.set(a)
-            self.b.set(b)
-            self.c.set(c)
-            self.d.set(d)
+        n = a.shape[0]
+        self.a = self.parameter_type(n).set(a)
+        self.b = self.parameter_type(n).set(b)
+        self.c = self.parameter_type(n).set(c)
+        self.d = self.parameter_type(n).set(d)
 
         self.sample_scale = sample_scale
 
@@ -184,13 +187,12 @@ class MultivariateARCHModel:
             "b": self.b,
             "c": self.c,
             "d": self.d,
-            "n": self.n,
             "sample_scale": self.sample_scale,
         }
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         if self.a is None or self.b is None or self.c is None or self.d is None:
-            raise ValueError("MultivariateARCHModel has not been initialized")
+            raise RuntimeError("MultivariateARCHModel has not been initialized")
         return [self.a.value, self.b.value, self.c.value, self.d.value]
 
     def log_parameters(self) -> None:
@@ -253,6 +255,13 @@ class MultivariateARCHModel:
             if not isinstance(scale_initial_value, torch.Tensor):
                 scale_initial_value = torch.tensor(
                     scale_initial_value, dtype=torch.float, device=self.device
+                )
+            if (
+                len(scale_initial_value.shape) != 2
+                or scale_initial_value.shape[0] != scale_initial_value.shape[1]
+            ):
+                raise ValueError(
+                    f"Shape of scale_intial_value ({scale_initial_value.shape}) must be square "
                 )
             scale_t = scale_initial_value
         else:
@@ -362,16 +371,10 @@ class MultivariateARCHModel:
         self.univariate_model.fit(observations)
         uv_scale, uv_mean = self.univariate_model.predict(observations)[:2]
 
-        n = observations.shape[1]
-        self.initialize_parameters(n)
-
         centered_observations = observations - uv_mean
         unscaled_centered_observations = centered_observations / uv_scale
 
-        self.sample_scale = self.transform_matrix(
-            unscaled_centered_observations.T
-            / torch.sqrt(torch.tensor(unscaled_centered_observations.shape[0]))
-        )
+        self.initialize_parameters(unscaled_centered_observations)
 
         self.log_parameters()
 
@@ -470,13 +473,13 @@ class MultivariateARCHModel:
             output: torch.Tensor - Sample model output
             h: torch.Tensor - Sqrt of covariance used to scale the sample
         """
-        if self.n is None:
-            raise ValueError(
+        if self.a is None or self.b is None or self.c is None or self.d is None:
+            raise RuntimeError(
                 "MultivariateARCHModel has not been trained or initialized"
             )
 
         if isinstance(n, int):
-            n = self.distribution.get_instance().sample((n, self.n))
+            n = self.distribution.get_instance().sample((n, self.sample_scale.shape[0]))
 
         # Next line is to keep mypy happy.
         if not isinstance(n, torch.Tensor):

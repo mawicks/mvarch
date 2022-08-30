@@ -383,7 +383,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         if self.a is None or self.b is None or self.c is None or self.d is None:
-            raise ValueError("UnivariateARCHModel has not been trained/initialized")
+            raise RuntimeError("UnivariateARCHModel has not been trained/initialized")
 
         return [self.a.value, self.b.value, self.c.value, self.d.value]
 
