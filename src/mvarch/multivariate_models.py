@@ -271,7 +271,7 @@ class MultivariateARCHModel:
         # such as being lower traingular with positive diagonal entries
         scale_t = self.transform_matrix(scale_t)
 
-        if constants.DEBUG:
+        if constants.DEBUG:  # pragma: no cover
             print(f"Initial scale: {scale_t}")
             print(f"self.d: {self.d.value if self.d is not None else None}")
             print(f"self.sample_scale: {self.sample_scale}")
@@ -395,7 +395,7 @@ class MultivariateARCHModel:
 
         def loss_closure() -> float:
             safe_value = lambda x: x.value if x is not None else None
-            if constants.DEBUG:
+            if constants.DEBUG:  # pragma: no cover
                 print(f"a: {safe_value(self.a)}")
                 print(f"b: {safe_value(self.b)}")
                 print(f"c: {safe_value(self.c)}")
@@ -482,8 +482,7 @@ class MultivariateARCHModel:
             n = self.distribution.get_instance().sample((n, self.sample_scale.shape[0]))
 
         # Next line is to keep mypy happy.
-        if not isinstance(n, torch.Tensor):
-            raise Exception("n isn't a tensor")
+        assert isinstance(n, torch.Tensor)
 
         mv_scale = self._predict(
             n, sample=True, scale_initial_value=mv_scale_initial_value
@@ -497,7 +496,7 @@ class MultivariateARCHModel:
         return output, mv_scale, uv_scale, uv_mean
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s:%(message)s",

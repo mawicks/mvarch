@@ -36,6 +36,7 @@ MVARCH_VALID_PARAMETERS = {
 }
 CONSTANT_MEAN = 7
 MVARCH_SCALE_INITIAL_VALUE = [[31, 0], [37, 39]]
+MVARCH_INVALID_SCALE_INITIAL_VALUE = [[31, 0]]
 MVARCH_CENTERED_OBSERVATIONS = [[39, 41], [0, 0]]
 MVARCH_DEFAULT_INITIAL_VALUE = [[391, 0], [551, 589]]  # This is d * sample_scale
 
@@ -63,13 +64,21 @@ SAMPLE_PREDICTED_SCALE = [[31, 37], [sqrt(36609878), sqrt(112917611)]]
 SAMPLE_PREDICTED_SCALE_NEXT = [sqrt(146503521), sqrt(1016400628)]
 
 # Here's a set of parameters that are not valid because their dimensions do not conform
-MVARCH_INVALID_PARAMETERS = {
+MVARCH_INVALID_PARAMETERS1 = {
     "a": [0.8, 0.7, 0.6],
     "b": [0.1, 0.2, 0.3, 0.4],
     "c": [0.03, 0.07, 0.11],
     "d": [2.0, 2.0],
     "sample_scale": [0.001, 0.002, 0.003],
 }
+MVARCH_INVALID_PARAMETERS2 = {
+    "a": [0.8, 0.7],
+    "b": [0.1, 0.2],
+    "c": [0.03, 0.07],
+    "d": [2.0, 2.0],
+    "sample_scale": [0.001, 0.002],
+}
+MVARCH_INVALID_PARAMETERS = [MVARCH_INVALID_PARAMETERS1, MVARCH_INVALID_PARAMETERS2]
 
 
 def test_mvarch_model():
@@ -81,8 +90,13 @@ def test_mvarch_model():
     noise = observations
 
     # Create a MV model with diagonal parmaeters.
+    # For coverage, make sure we can construct a model with each possible parameter type:
+
+    for constraint in ParameterConstraint.__members__.values():
+        model = MultivariateARCHModel(constraint=constraint)
 
     model = MultivariateARCHModel(constraint=ParameterConstraint.DIAGONAL)
+
     with pytest.raises(RuntimeError):
         model.get_optimizable_parameters()
 
@@ -129,8 +143,15 @@ def test_mvarch_model():
         scale[0, :], torch.tensor(MVARCH_DEFAULT_INITIAL_VALUE)
     )
 
+    # For coverage, try several bad parameter values with gates:
+    for p in MVARCH_INVALID_PARAMETERS:
+        with pytest.raises(ValueError):
+            model.set_parameters(**p)
+
     with pytest.raises(ValueError):
-        model.set_parameters(**MVARCH_INVALID_PARAMETERS)
+        model._predict(
+            observations, scale_initial_value=MVARCH_INVALID_SCALE_INITIAL_VALUE
+        )
 
 
 def test_joint_log_likelihood():
@@ -200,42 +221,44 @@ def test_arch_fit():
         random_observations - torch.mean(random_observations)
     ) / torch.std(random_observations) * CONSTANT_SCALE + CONSTANT_MEAN
 
-    model = UnivariateARCHModel(mean_model=ARMAMeanModel())
-    model.fit(random_observations)
+    for univariate_model in (UnivariateARCHModel(), UnivariateUnitScalingModel()):
+        model = MultivariateARCHModel(
+            constraint=ParameterConstraint.FULL, univariate_model=univariate_model
+        )
+        model.fit(random_observations)
 
-    print("mean model parameters: ", model.mean_model.get_parameters())
-    print("scale model parameters: ", model.get_parameters())
+        # print("mean model parameters: ", model.mean_model.get_parameters())
+        print("MV scale model parameters: ", model.get_parameters())
 
-    scale_next, mean_next = model.predict(random_observations)[2:]
+        mv_scale_next = model.predict(random_observations)[3]
 
-    print("mean prediction: ", mean_next)
-    print("scale prediction: ", scale_next)
+        print("MV scale prediction: ", mv_scale_next)
 
-    # assert abs(scale_next - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
-    # assert abs(mean_next - CONSTANT_MEAN) < TOLERANCE * abs(CONSTANT_MEAN)
+        # assert abs(scale_next - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
+        # assert abs(mean_next - CONSTANT_MEAN) < TOLERANCE * abs(CONSTANT_MEAN)
 
-    # Make sure that sample(int) returns something reasonable
-    sample_output = model.sample(SAMPLE_SIZE)[0]
-    sample_mean = float(torch.mean(sample_output))
-    sample_std = float(torch.std(sample_output))
+        # Make sure that sample(int) returns something reasonable
+        sample_output = model.sample(SAMPLE_SIZE)[0]
+        sample_mean = float(torch.mean(sample_output))
+        sample_std = float(torch.std(sample_output))
 
-    print("sample mean: ", sample_mean)
-    print("sample std: ", sample_std)
+        print("sample mean: ", sample_mean)
+        print("sample std: ", sample_std)
 
-    # assert abs(sample_mean - CONSTANT_MEAN) < TOLERANCE * CONSTANT_MEAN
-    # assert abs(sample_std - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
+        # assert abs(sample_mean - CONSTANT_MEAN) < TOLERANCE * CONSTANT_MEAN
+        # assert abs(sample_std - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
 
-    # Check that the log likelihoods being returned are reasonable
-    actual = model.mean_log_likelihood(random_observations)
+        # Check that the log likelihoods being returned are reasonable
+        actual = model.mean_log_likelihood(random_observations)
 
-    # What should this be?  -0.5 E[x**2] / (sigma**2) - 0.5*log(2*pi) - log(sigma)
-    # Which is -.5(1+log(2*pi)) - log(sigma)
+        # What should this be?  -0.5 E[x**2] / (sigma**2) - 0.5*log(2*pi) - log(sigma)
+        # Which is -.5(1+log(2*pi)) - log(sigma)
 
-    expected = -0.5 * (1 + np.log(2 * np.pi)) - np.log(CONSTANT_SCALE)
+        expected = -0.5 * (1 + np.log(2 * np.pi)) - np.log(CONSTANT_SCALE)
 
-    print("actual: ", actual)
-    print("expected: ", expected)
+        print("actual: ", actual)
+        print("expected: ", expected)
 
-    # Since these are logs, we use an absolute tolerance rather than a relative tolerance
-    # Again, this is just a sanity check and not a very stringent test.
-    # assert abs(actual - expected) < TOLERANCE
+        # Since these are logs, we use an absolute tolerance rather than a relative tolerance
+        # Again, this is just a sanity check and not a very stringent test.
+        # assert abs(actual - expected) < TOLERANCE
