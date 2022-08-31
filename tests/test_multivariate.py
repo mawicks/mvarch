@@ -41,27 +41,26 @@ MVARCH_CENTERED_OBSERVATIONS = [[39, 41], [0, 0]]
 MVARCH_DEFAULT_INITIAL_VALUE = [[391, 0], [551, 589]]  # This is d * sample_scale
 
 # Here's what should happen:
-#    sigma0 = [31, 37] # Supplied initial value
-#    [a*sigma0, b*obs0,c*sample_scale]:
-#        [[62, 111], [195, 287], [253, 377]] -> sqrt([105878, 236819])
-#    This leads to sigma1 = sqrt([105878, 236819]) = [325.38..., 486.64...]
+#    sigma0 = [[31, 0], [37, 39]] # Supplied initial value
+#    [a*sigma0;  b*obs0;  c*sample_scale]:
+#        [[62, 0], [111, 117]];   [195, 287];  [[253, 0], [377, 403]]
+#    i.e., [[ 62,    0, 195, 253,   0]
+#           [ 111, 117, 287, 377, 403]]
+#    so that h @ h.T = [[ 105878, 158228], [158228, 412917]]
 #    Next iteration:
 #    [a*sigma1, b*obs1, c*sample_scale]:
-#       [[2*sqrt(105878), 3*sqrt(236819)], [0, 0], [253, 377]
-#    This leads to sigma2 = sqrt([487521, 2273500]) = [698.22..., 1507.81...]
 
-PREDICTED_SCALE = [[31, 37], [sqrt(105878), sqrt(236819)]]
-PREDICTED_SCALE_NEXT = [sqrt(487521), sqrt(2273500)]
+PREDICTED_SCALE_SQUARED = [[105878, 158228], [158228, 412917]]
 
 # When sample is set to one, the input is scaled by the predicted scale.
-#    sigma0 = [31, 37] # Supplied initial value
-#    [a*sigma0, b*(sigma0*obs0), c*sample_scale]:
-#        [[62, 111], [6045, 10619], [253, 377]] -> sqrt([36609878, 112917611])
-#    Next iteration:
-#         [[2*sqrt(36609878), 3*sqrt(112917611)], [0, 0], [253, 377]] -> sqrt([[146503521, 1016400628])
+#    scale0 = [[31, 0], [37, 39]] # Supplied initial value
+#    [a*scale0, b*(scale0*obs0), c*sample_scale]:
+#        [[62, 0], [111, 117]];  [6045, 21294];  [[253, 0], [377, 402]]
+#    i.e., [[ 62,    0, 6045, 253,   0]
+#           [ 111, 117, 21294, 377, 403]]
+#    so that h @ h.T = [[ 36609878, 128824493], [128824493, 453772904]]
 
-SAMPLE_PREDICTED_SCALE = [[31, 37], [sqrt(36609878), sqrt(112917611)]]
-SAMPLE_PREDICTED_SCALE_NEXT = [sqrt(146503521), sqrt(1016400628)]
+SAMPLE_PREDICTED_SCALE_SQUARED = [[36609878, 128824493], [128824493, 453772904]]
 
 # Here's a set of parameters that are not valid because their dimensions do not conform
 MVARCH_INVALID_PARAMETERS1 = {
@@ -106,39 +105,41 @@ def test_mvarch_model():
     utils.set_and_check_parameters(model, observations, MVARCH_VALID_PARAMETERS, 5, 4)
 
     # Case 1: _predict with sample=False and specified initial value
-    scale, scale_next = model._predict(
+    scale = model._predict(
         observations, scale_initial_value=MVARCH_SCALE_INITIAL_VALUE
-    )[:2]
-
-    # ASSERT SOMETHING LIKE THIS
-
-    # assert utils.tensors_about_equal(
-    # scale_next, torch.tensor(PREDICTED_SCALE_NEXT, dtype=torch.float)
-    #    )
+    )[0]
 
     print("_predict() with sample=False")
-    print("scale: ", scale)
-    print("scale**2: ", scale**2)
-    print("scale_next: ", scale_next)
-    print("scale_next**2: ", scale_next**2)
+
+    assert utils.tensors_about_equal(
+        scale[0], torch.tensor(MVARCH_SCALE_INITIAL_VALUE, dtype=torch.float)
+    )
+
+    assert utils.tensors_about_equal(
+        scale[1] @ scale[1].T, torch.tensor(PREDICTED_SCALE_SQUARED, dtype=torch.float)
+    )
 
     # Case 2: _predict with sample=True and specified initial value
-    sample_scale, sample_scale_next = model._predict(
+    sample_scale = model._predict(
         observations, sample=True, scale_initial_value=MVARCH_SCALE_INITIAL_VALUE
-    )[:2]
-
-    # ASSERT SOMETHING
+    )[0]
 
     print("_predict() with sample=True")
-    print("sample_scale: ", sample_scale)
-    print("sample_scale**2: ", sample_scale**2)
-    print("sample_scale_next: ", sample_scale_next)
-    print("sample_scale_next**2: ", sample_scale_next**2)
+
+    assert utils.tensors_about_equal(
+        sample_scale[0], torch.tensor(MVARCH_SCALE_INITIAL_VALUE, dtype=torch.float)
+    )
+
+    sample_scale_squared = sample_scale[1] @ sample_scale[1].T
+    assert utils.tensors_about_equal(
+        sample_scale_squared,
+        torch.tensor(SAMPLE_PREDICTED_SCALE_SQUARED, dtype=torch.float),
+        eps=1e-5,  # Use a slightly larger eps for this test because of the matrix "squaring"
+    )
 
     # Case 3: _predict with sample=False and using default initial value.
-    scale, scale_next = model._predict(observations)
+    scale = model._predict(observations)[0]
 
-    # ASSERT SOMETHING LIKE THIS
     assert utils.tensors_about_equal(
         scale[0, :], torch.tensor(MVARCH_DEFAULT_INITIAL_VALUE)
     )

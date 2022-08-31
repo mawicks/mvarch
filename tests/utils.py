@@ -4,10 +4,14 @@ EPS = 5e-6
 
 
 def tensors_about_equal(t1, t2, eps=EPS):
-    result = torch.norm(t1 - t2) < EPS * torch.norm(t1 + t2)
+    diff_norm = torch.norm(t1 - t2)
+    sum_norm = torch.norm(t1 + t2)
+    result = diff_norm < eps * sum_norm
     if not result:
         print("first tensor:\n", t1)
         print("second tensor:\n", t2)
+        print("norm of diff:\n", diff_norm)
+        print("norm of sum:\n", sum_norm)
     return result
 
 
