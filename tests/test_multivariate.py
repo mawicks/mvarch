@@ -8,7 +8,7 @@ import torch
 
 # Local modules
 # From package under test
-from mvarch.mean_models import ARMAMeanModel
+from mvarch.mean_models import ARMAMeanModel, ZeroMeanModel
 from mvarch.univariate_models import (
     marginal_conditional_log_likelihood,
     UnivariateUnitScalingModel,
@@ -200,29 +200,76 @@ def test_joint_log_likelihood():
     # assert abs(expected - actual) < utils.EPS * abs(expected)
 
 
+def generate_observations(sample_size, mean_vector, scale_vector, correlation: float):
+    """
+    Generate two sequences with a correlation of `correlation`
+    """
+    if len(mean_vector) != 2 or len(scale_vector) != 2:
+        raise ValueError("Vectors must have length of 2")
+
+    white_noise = torch.randn((sample_size, 2))
+    # Correct sample mean, sample variance, and orthogonality slightly so that the
+    # sample statistics are what we want.
+    white_noise = white_noise - torch.mean(white_noise, dim=0)
+    white_noise = torch.linalg.qr(white_noise, mode="reduced")[0] * sqrt(sample_size)
+
+    # Resulting sample should have 1) zero mean; 2) unit variance; 3) orthogonal columns
+
+    # Expand everyhing to be either (sample_size, n, 1) or (sample_size, n, n) to make
+    # dimensions conform and to remove any ambiguity in the matrix multiply.
+
+    white_noise = white_noise.unsqueeze(2).expand((sample_size, 2, 1))
+    mean_vector = mean_vector.unsqueeze(0).unsqueeze(2).expand(white_noise.shape)
+    scale_vector = scale_vector.unsqueeze(0).unsqueeze(2).expand(white_noise.shape)
+    # Construct sample matrix and expand scale_matrix along sample dimension
+    scale_matrix = (
+        torch.tensor([[1.0, 0.0], [correlation, sqrt(1.0 - correlation**2)]])
+        .unsqueeze(0)
+        .expand((sample_size, 2, 2))
+    )
+
+    # Multiply and drop the last dimension.
+    random_observations = (
+        scale_vector * (scale_matrix @ white_noise) + mean_vector
+    ).squeeze(2)
+    return random_observations
+
+
 def test_arch_fit():
     """As a basic sanity check, test fit a model on white noise with
     constant variance and see if the model predicts that constant
     variance.
     """
-    CONSTANT_SCALE = 0.25
-    CONSTANT_MEAN = 0.0
-    SAMPLE_SIZE = 25  # Was 2500
+    CONSTANT_MEAN = {
+        UnivariateARCHModel: torch.tensor([0.5, -0.25]),
+        UnivariateUnitScalingModel: torch.tensor([0.0, 0.0]),
+    }
+
+    MEAN_MODEL_TYPE = {
+        UnivariateARCHModel: ARMAMeanModel,
+        UnivariateUnitScalingModel: ZeroMeanModel,
+    }
+    CONSTANT_UV_SCALE = torch.tensor([0.25, 0.1])
+    SAMPLE_SIZE = 100  # Was 2500
+    CORRELATION = -0.5
     TOLERANCE = 0.075
 
-    # The tolerance hasn't been chosen very scientifically.  The sample size
-    # is fairly small for a quick test so it won't be tight.
+    for univariate_model_type in (UnivariateARCHModel, UnivariateUnitScalingModel):
+        random_observations = generate_observations(
+            SAMPLE_SIZE,
+            CONSTANT_MEAN[univariate_model_type],
+            CONSTANT_UV_SCALE,
+            CORRELATION,
+        )
 
-    random_observations = torch.randn((SAMPLE_SIZE, 1))
+        print("mean of observations: ", torch.mean(random_observations, dim=0))
+        print("std of observations: ", torch.std(random_observations, dim=0))
+        x = random_observations - torch.mean(random_observations, dim=0)
+        print("cov of observations: ", (x.T @ x) / SAMPLE_SIZE)
 
-    # The sample variance is random.  Scale the sample so that the
-    # sample standard deviation and the sample mean are *exactly* what
-    # we expect the model to predict.
-    random_observations = (
-        random_observations - torch.mean(random_observations)
-    ) / torch.std(random_observations) * CONSTANT_SCALE + CONSTANT_MEAN
-
-    for univariate_model in (UnivariateARCHModel(), UnivariateUnitScalingModel()):
+        univariate_model = univariate_model_type(
+            mean_model=MEAN_MODEL_TYPE[univariate_model_type]()
+        )
         model = MultivariateARCHModel(
             constraint=ParameterConstraint.FULL, univariate_model=univariate_model
         )
@@ -255,7 +302,7 @@ def test_arch_fit():
         # What should this be?  -0.5 E[x**2] / (sigma**2) - 0.5*log(2*pi) - log(sigma)
         # Which is -.5(1+log(2*pi)) - log(sigma)
 
-        expected = -0.5 * (1 + np.log(2 * np.pi)) - np.log(CONSTANT_SCALE)
+        expected = -0.5 * (1 + np.log(2 * np.pi)) - np.log(CONSTANT_UV_SCALE)
 
         print("actual: ", actual)
         print("expected: ", expected)

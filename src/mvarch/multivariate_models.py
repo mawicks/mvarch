@@ -132,6 +132,11 @@ class MultivariateARCHModel:
         self.c = self.parameter_type(n, 0.01, self.device)
         self.d = self.parameter_type(n, 1.0, self.device)
 
+        # Pre-multiply by the sqrt of the sample size.
+        # This is equivalent to dividing o.T@o byn
+        # C = E[o.T @ o] approximated by (o.T @o)/n
+        # The qr in transform_matrix factors o.T @ o
+
         self.sample_scale = self.transform_matrix(
             unscaled_centered_observations.T
             / torch.sqrt(torch.tensor(unscaled_centered_observations.shape[0]))
