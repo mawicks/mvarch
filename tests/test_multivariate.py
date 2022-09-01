@@ -318,22 +318,28 @@ def test_arch_fit():
     sample_output = model.sample(SAMPLE_SIZE)[0]
     sample_mean = torch.mean(sample_output, dim=0)
     sample_std = torch.std(sample_output, dim=0)
+    sample_corrcoef = torch.corrcoef(sample_output.T)
 
     print("sample mean: ", sample_mean)
     print("sample std: ", sample_std)
+    print("sample corrcoef: ", sample_corrcoef)
 
-    # assert abs(sample_mean - CONSTANT_MEAN) < TOLERANCE * CONSTANT_MEAN
+    assert utils.tensors_about_equal(
+        sample_mean, CONSTANT_MEAN[univariate_model_type], TOLERANCE
+    )
     assert utils.tensors_about_equal(sample_std, CONSTANT_UV_SCALE, TOLERANCE)
+    assert utils.tensors_about_equal(
+        sample_corrcoef, CONSTANT_MV_SCALE @ CONSTANT_MV_SCALE.T, TOLERANCE
+    )
 
     # Check that the log likelihoods being returned are reasonable
     actual = model.mean_log_likelihood(random_observations)
+    print("actual: ", actual)
 
+    # FIXME
     # What should this be?  -0.5 E[x**2] / (sigma**2) - 0.5*log(2*pi) - log(sigma)
     # Which is -.5(1+log(2*pi)) - log(sigma)
-
-    # expected = -0.5 * (1 + np.log(2 * np.pi)) - np.log(CONSTANT_UV_SCALE)
-
-    print("actual: ", actual)
+    # expected = torch.sum(-0.5 * (1 + np.log(2 * np.pi)) - torch.log(CONSTANT_UV_SCALE))
     # print("expected: ", expected)
 
     # Since these are logs, we use an absolute tolerance rather than a relative tolerance
