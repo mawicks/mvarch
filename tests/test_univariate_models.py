@@ -225,8 +225,8 @@ def test_arch_fit():
     constant variance and see if the model predicts that constant
     variance.
     """
-    CONSTANT_SCALE = 0.25
-    CONSTANT_MEAN = 0.5
+    CONSTANT_SCALE = torch.tensor(0.25)
+    CONSTANT_MEAN = torch.tensor(0.5)
     SAMPLE_SIZE = 2500
     TOLERANCE = 0.075
 
@@ -253,8 +253,8 @@ def test_arch_fit():
     print("mean prediction: ", mean_next)
     print("scale prediction: ", scale_next)
 
-    assert abs(scale_next - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
-    assert abs(mean_next - CONSTANT_MEAN) < TOLERANCE * abs(CONSTANT_MEAN)
+    assert utils.tensors_about_equal(scale_next, CONSTANT_SCALE, TOLERANCE)
+    assert utils.tensors_about_equal(mean_next, CONSTANT_MEAN, TOLERANCE)
 
     # Make sure that sample(int) returns something reasonable
     sample_output = model.sample(SAMPLE_SIZE)[0]
@@ -264,8 +264,8 @@ def test_arch_fit():
     print("sample mean: ", sample_mean)
     print("sample std: ", sample_std)
 
-    assert abs(sample_mean - CONSTANT_MEAN) < TOLERANCE * CONSTANT_MEAN
-    assert abs(sample_std - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
+    assert utils.tensors_about_equal(sample_std, CONSTANT_SCALE, TOLERANCE)
+    assert utils.tensors_about_equal(sample_mean, CONSTANT_MEAN, TOLERANCE)
 
     # Check that the log likelihoods being returned are reasonable
     actual = model.mean_log_likelihood(random_observations)

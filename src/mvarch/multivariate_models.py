@@ -187,11 +187,12 @@ class MultivariateARCHModel:
         self.sample_scale = sample_scale
 
     def get_parameters(self) -> Dict[str, Any]:
+        safe_value = lambda x: x.value.detach().numpy() if x is not None else None
         return {
-            "a": self.a,
-            "b": self.b,
-            "c": self.c,
-            "d": self.d,
+            "a": safe_value(self.a),
+            "b": safe_value(self.b),
+            "c": safe_value(self.c),
+            "d": safe_value(self.d),
             "sample_scale": self.sample_scale,
         }
 
