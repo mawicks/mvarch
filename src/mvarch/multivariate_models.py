@@ -26,14 +26,14 @@ from .optimize import optimize
 
 
 def joint_conditional_log_likelihood(
-    observations: torch.Tensor,
+    centered_observations: torch.Tensor,
     mv_scale: torch.Tensor,
     distribution: torch.distributions.Distribution,
     uv_scale=Union[torch.Tensor, None],
 ) -> torch.Tensor:
     """
     Arguments:
-       observations: torch.Tensor of shape (n_obs, n_symbols)
+       centered_observations: torch.Tensor of shape (n_obs, n_symbols)
        mv_scale: torch.Tensor of shape (n_symbols, n_symbols)
            transformation is a lower-triangular matrix and the outcome is presumed
            to be z = transformation @ e where the elements of e are iid from distrbution.
@@ -57,22 +57,22 @@ def joint_conditional_log_likelihood(
     # only the diagonal entries need to be used in the determinant calculation.
     # This should be faster than calling log_det().
 
-    log_det = torch.log(torch.abs(torch.diagonal(mv_scale, dim1=1, dim2=2)))
+    log_diag = torch.log(torch.abs(torch.diagonal(mv_scale, dim1=1, dim2=2)))
 
     if uv_scale is not None:
-        log_det = log_det + torch.log(torch.abs(uv_scale))
-        observations = observations / uv_scale
+        log_diag = log_diag + torch.log(torch.abs(uv_scale))
+        centered_observations = centered_observations / uv_scale
 
-    # First get the innovations sequence by forming transformation^(-1)*observations
+    # First get the innovations sequence by forming transformation^(-1)*centered_observations
     # The unsqueeze is necessary because the matmul is on the 'batch'
     # of observations.  The shape of `t` is (n_obs, n, n) while
-    # the shape of `observations` is (n_obs, n). Without adding the
+    # the shape of `centered_observations` is (n_obs, n). Without adding the
     # extract dimension to observations, the solver won't see conforming dimensions.
     # We remove the ambiguity, by making observations` have shape (n_obj, n, 1), then
     # we remove the extra dimension from e.
     e = torch.linalg.solve_triangular(
         mv_scale,
-        observations.unsqueeze(2),
+        centered_observations.unsqueeze(2),
         upper=False,
     ).squeeze(2)
 
@@ -81,8 +81,10 @@ def joint_conditional_log_likelihood(
     # Compute the log likelihoods on the innovations
     log_pdf = distribution.log_prob(e)
 
-    ll = torch.sum(log_pdf - log_det, dim=1)
+    # Sum across the symbols (columns)
+    ll = torch.sum(log_pdf - log_diag, dim=1)
 
+    # Mean across the rows (samples)
     return torch.mean(ll)
 
 

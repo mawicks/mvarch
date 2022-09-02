@@ -231,7 +231,7 @@ def test_arch_fit():
     TOLERANCE = 0.075
 
     # The tolerance hasn't been chosen very scientifically.  The sample size
-    # is fairly small for a quick test so it won't be tight.
+    # Is fairly small for a quick test so it won't be tight.
 
     random_observations = torch.randn((SAMPLE_SIZE, 1))
 

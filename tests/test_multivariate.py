@@ -227,19 +227,22 @@ def generate_observations(
     # Expand everyhing to be either (sample_size, n, 1) or (sample_size, n, n) to make
     # dimensions conform and to remove any ambiguity in the matrix multiply.
 
-    white_noise = white_noise.unsqueeze(2).expand(
+    white_noise_expanded = white_noise.unsqueeze(2).expand(
         (sample_size, mean_vector.shape[0], 1)
     )
-    mean_vector = mean_vector.unsqueeze(0).unsqueeze(2).expand(white_noise.shape)
-    uv_scale = uv_scale.unsqueeze(0).unsqueeze(2).expand(white_noise.shape)
+    mean_vector = (
+        mean_vector.unsqueeze(0).unsqueeze(2).expand(white_noise_expanded.shape)
+    )
+    uv_scale = uv_scale.unsqueeze(0).unsqueeze(2).expand(white_noise_expanded.shape)
     # Construct sample matrix and expand scale_matrix along sample dimension
     scale_matrix = mv_scale.unsqueeze(0).expand((sample_size,) + mv_scale.shape)
 
     # Multiply and drop the last dimension.
     random_observations = (
-        uv_scale * (scale_matrix @ white_noise) + mean_vector
+        uv_scale * (scale_matrix @ white_noise_expanded) + mean_vector
     ).squeeze(2)
-    return random_observations
+
+    return random_observations, white_noise
 
 
 def observation_stats(observations):
@@ -288,7 +291,7 @@ def test_arch_fit():
     TOLERANCE = 0.075
 
     univariate_model_type = UnivariateARCHModel
-    random_observations = generate_observations(
+    random_observations, white_noise_used = generate_observations(
         SAMPLE_SIZE,
         CONSTANT_MEAN[univariate_model_type],
         CONSTANT_UV_SCALE,
@@ -333,14 +336,19 @@ def test_arch_fit():
     )
 
     # Check that the log likelihoods being returned are reasonable
-    actual = model.mean_log_likelihood(random_observations)
-    print("actual: ", actual)
+    model_log_likelihood = model.mean_log_likelihood(random_observations)
 
     # FIXME
-    # What should this be?  -0.5 E[x**2] / (sigma**2) - 0.5*log(2*pi) - log(sigma)
-    # Which is -.5(1+log(2*pi)) - log(sigma)
-    # expected = torch.sum(-0.5 * (1 + np.log(2 * np.pi)) - torch.log(CONSTANT_UV_SCALE))
-    # print("expected: ", expected)
+    # What should this be?
+    # -0.5 sum(E[e_i**2] + log(2*pi)) - sum(log(uv_scale)) - sum(log(diag(mv_scale)))
+    expected_log_likelihood = -torch.sum(
+        0.5 * (1 + np.log(2 * np.pi))
+        + torch.log(CONSTANT_UV_SCALE)
+        + torch.log(torch.abs(torch.diag(CONSTANT_MV_SCALE)))
+    )
+    print("log likelihood: ", model_log_likelihood)
+    print("expected log_likelihood: ", expected_log_likelihood)
+    assert utils.tensors_about_equal(model_log_likelihood, expected_log_likelihood)
 
     # Since these are logs, we use an absolute tolerance rather than a relative tolerance
     # Again, this is just a sanity check and not a very stringent test.
