@@ -134,6 +134,12 @@ class MultivariateARCHModel:
         self.c = self.parameter_type(n, 0.01, self.device)
         self.d = self.parameter_type(n, 1.0, self.device)
 
+        # Recenter. This is important when the centering in the caller
+        # was done with initialized but untuned means.
+        unscaled_centered_observations = unscaled_centered_observations - torch.mean(
+            unscaled_centered_observations, dim=0
+        )
+
         # Pre-multiply by the sqrt of the sample size.
         # This is equivalent to dividing o.T@o byn
         # C = E[o.T @ o] approximated by (o.T @o)/n
@@ -376,23 +382,48 @@ class MultivariateARCHModel:
         return float(result)
 
     def fit(self, observations: torch.Tensor) -> None:
-        self.univariate_model.fit(observations)
-        uv_scale, uv_mean = self.univariate_model.predict(observations)[:2]
+        """Fit a multivariate model along with any underlying univariate,
+        mean, and distribution models.
 
-        centered_observations = observations - uv_mean
-        unscaled_centered_observations = centered_observations / uv_scale
+        """
+        centered_observations: Optional[torch.Tensor]
+        uv_scale: Optional[torch.Tensor]
+        uv_mean: Optional[torch.Tensor]
 
-        self.initialize_parameters(unscaled_centered_observations)
+        # If the underlying univariate model has optimizeable
+        # parameters, optimize it.  The fit() call also tunes the mean
+        # model and the distribution model parameters contained within
+        # the univariate model.
+
+        if self.univariate_model.is_optimizable:
+            self.univariate_model.fit(observations)
+            uv_scale, uv_mean = self.univariate_model.predict(observations)[:2]
+            centered_observations = observations - uv_mean
+            self.initialize_parameters(centered_observations / uv_scale)
+        else:
+            # Since we don't call fit() on the univariate model, its
+            # mean model will have be initialized. Initialize its mean
+            # model directly.
+            self.univariate_model.mean_model.initialize_parameters(observations)
+            self.univariate_model.initialize_parameters(observations)
+            self.initialize_parameters(observations)
+            centered_observations = uv_scale = uv_mean = None
 
         self.log_parameters()
 
+        # We always optimize the multivariate model parameters here.
         parameters = self.get_optimizable_parameters()
-        # If there is no univariate model, tune the distribution.
-        # and the mean model.
-        # Otherwise don't modify the parameter values obtained while
-        # optimizing the univariate distribution.
-        if isinstance(self.univariate_model, UnivariateUnitScalingModel):
-            parameters = parameters + self.distribution.get_optimizable_parameters()
+
+        # If the univariate model isn't optimizable alone, add the
+        # mean model parameters and the distribution parameters,
+        # because they weren't optimized above.
+
+        if not self.univariate_model.is_optimizable:
+            parameters = (
+                parameters
+                + self.univariate_model.mean_model.get_optimizable_parameters()
+                + self.distribution.get_optimizable_parameters()
+            )
 
         optim = torch.optim.LBFGS(
             parameters,
@@ -409,10 +440,34 @@ class MultivariateARCHModel:
                 print(f"c: {safe_value(self.c)}")
                 print(f"d: {safe_value(self.d)}")
                 print()
+
             optim.zero_grad()
 
+            # If the underlying univariate model is being optimized,
+            # then the univariate predictions must be recomputed here.
+            # Otherwise they come from above.
+            if self.univariate_model.is_optimizable:
+                assert isinstance(centered_observations, torch.Tensor)
+                assert isinstance(uv_scale, torch.Tensor)
+
+                closure_centered_observations = centered_observations
+                closure_uv_scale = uv_scale
+            else:
+                closure_uv_mean = self.univariate_model.mean_model._predict(
+                    observations
+                )[0]
+                closure_centered_observations = observations - closure_uv_mean
+                closure_uv_scale = self.univariate_model._predict(
+                    closure_centered_observations
+                )[0]
+                closure_centered_observations = (
+                    closure_centered_observations / closure_uv_scale
+                )
+
             # Do not use scaled observations here; centering is okay.
-            loss = -self.__mean_log_likelihood(centered_observations, uv_scale=uv_scale)
+            loss = -self.__mean_log_likelihood(
+                closure_centered_observations, uv_scale=closure_uv_scale
+            )
             loss.backward()
 
             return float(loss)
@@ -420,8 +475,8 @@ class MultivariateARCHModel:
         optimize(optim, loss_closure, "multivariate model")
 
         self.distribution.log_parameters()
-        self.univariate_model.log_parameters()
         self.univariate_model.mean_model.log_parameters()
+        self.univariate_model.log_parameters()
         self.log_parameters()
 
         logging.debug("Gradients: ")

@@ -257,14 +257,8 @@ def observation_stats(observations):
 
 
 def make_model(univariate_model_type):
-    MEAN_MODEL_TYPE = {
-        UnivariateARCHModel: ARMAMeanModel,
-        UnivariateUnitScalingModel: ZeroMeanModel,
-    }
-
-    univariate_model = univariate_model_type(
-        mean_model=MEAN_MODEL_TYPE[univariate_model_type]()
-    )
+    MEAN_MODEL_TYPE = ARMAMeanModel
+    univariate_model = univariate_model_type(mean_model=MEAN_MODEL_TYPE())
 
     model = MultivariateARCHModel(
         constraint=ParameterConstraint.FULL, univariate_model=univariate_model
@@ -279,14 +273,29 @@ def test_arch_fit():
     """
     CONSTANT_MEAN = torch.tensor([0.5, -0.25])
     CONSTANT_UV_SCALE = torch.tensor([0.25, 0.1])
-    SAMPLE_SIZE = 1000  # Was 2500
+    SAMPLE_SIZE = 2000  # Was 2500
     CORRELATION = -0.5
     CONSTANT_MV_SCALE = torch.tensor(
         [[1.0, 0.0], [CORRELATION, sqrt(1.0 - CORRELATION**2)]]
     )
     TOLERANCE = 0.075
 
-    for univariate_model_type in (UnivariateARCHModel,):
+    EXPECTED_UV_SCALE = {
+        UnivariateARCHModel: CONSTANT_UV_SCALE,
+        UnivariateUnitScalingModel: torch.ones(2),
+    }
+
+    EXPECTED_MV_SCALE = {
+        UnivariateARCHModel: CONSTANT_MV_SCALE,
+        UnivariateUnitScalingModel: CONSTANT_UV_SCALE.unsqueeze(1).expand(2, 2)
+        * CONSTANT_MV_SCALE,
+    }
+
+    # These with both a UnivariateARCHModel and a
+    # UnivarateUnitScalingModel since they are quite differnet and
+    # have different code paths.
+    for univariate_model_type in (UnivariateARCHModel, UnivariateUnitScalingModel):
+        print(f"univariate_model_type: {univariate_model_type}")
         random_observations, white_noise_used = generate_observations(
             SAMPLE_SIZE,
             CONSTANT_MEAN,
@@ -310,8 +319,12 @@ def test_arch_fit():
         print("MV scale prediction: ", mv_scale_next)
 
         assert utils.tensors_about_equal(uv_mean_next, CONSTANT_MEAN, TOLERANCE)
-        assert utils.tensors_about_equal(uv_scale_next, CONSTANT_UV_SCALE, TOLERANCE)
-        assert utils.tensors_about_equal(mv_scale_next, CONSTANT_MV_SCALE, TOLERANCE)
+        assert utils.tensors_about_equal(
+            uv_scale_next, EXPECTED_UV_SCALE[univariate_model_type], TOLERANCE
+        )
+        assert utils.tensors_about_equal(
+            mv_scale_next, EXPECTED_MV_SCALE[univariate_model_type], TOLERANCE
+        )
 
         # Make sure that sample(int) returns something reasonable
         sample_output = model.sample(SAMPLE_SIZE)[0]
@@ -347,7 +360,3 @@ def test_arch_fit():
         # Again, this is just a sanity check and not a very stringent test.
         # assert abs(actual - expected) < TOLERANCE
         assert torch.abs(model_log_likelihood - expected_log_likelihood) < TOLERANCE
-
-    # This is here for coverage.  We're not checking the return values.
-    model = make_model(UnivariateUnitScalingModel)
-    model.fit(random_observations)

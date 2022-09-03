@@ -48,11 +48,13 @@ def check_constant_prediction(
     )
 
 
-def test_scaling_model():
+def test_unit_scaling_model():
     N = 3
     observations = torch.randn((10, N), dtype=torch.float)
     noise = torch.randn(observations.shape, dtype=torch.float)
     model = UnivariateUnitScalingModel()
+
+    assert model.is_optimizable == False
 
     with pytest.raises(ValueError):
         model.sample(10)
@@ -65,12 +67,6 @@ def test_scaling_model():
         torch.ones(observations.shape[1], dtype=torch.float),
         torch.zeros(observations.shape[1], dtype=torch.float),
     )
-
-
-def test_constant_scale_with_armma_mean_fails():
-    mean_model = ARMAMeanModel()
-    with pytest.raises(ValueError):
-        model = UnivariateUnitScalingModel(mean_model=mean_model)
 
 
 # These aren't realistic values.  They're just some nice whole numbers for testing.
@@ -128,6 +124,8 @@ def test_arch_model():
     noise = observations
 
     model = UnivariateARCHModel()
+    assert model.is_optimizable == True
+
     with pytest.raises(RuntimeError):
         model.get_optimizable_parameters()
 

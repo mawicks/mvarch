@@ -67,6 +67,11 @@ class UnivariateScalingModel(Protocol):
     def get_parameters(self) -> Dict[str, Any]:
         """Abstract method with no implementation."""
 
+    @property
+    @abstractmethod
+    def is_optimizable(self) -> bool:
+        """Abstract method with no implementation."""
+
     @abstractmethod
     def log_parameters(self) -> None:
         """Abstract method with no implementation."""
@@ -112,31 +117,36 @@ class UnivariateScalingModel(Protocol):
         self.initialize_parameters(observations)
         self.log_parameters()
 
-        model_parameters = (
-            self.mean_model.get_optimizable_parameters()
-            + self.get_optimizable_parameters()
-        )
-        if len(model_parameters) > 0:
-            optim = torch.optim.LBFGS(
-                model_parameters + self.distribution.get_optimizable_parameters(),
-                max_iter=constants.PROGRESS_ITERATIONS,
-                lr=constants.LEARNING_RATE,
-                line_search_fn="strong_wolfe",
+        model_parameters = self.get_optimizable_parameters()
+        if len(model_parameters) == 0:
+            raise ValueError(
+                f"Mean model: Don't call fit() on a univariate model without tunable parameters. "
+                f"If you're trying to fit the underlying mean model, use the univariate model "
+                f"in a multivariate model and call fit() on the multivariate model."
             )
 
-            def loss_closure() -> float:
-                if constants.DEBUG:  # pragma: no cover
-                    self.log_parameters()
-                optim.zero_grad()
-                loss = -self.__mean_log_likelihood(observations)
-                loss.backward()
-                return float(loss)
+        model_parameters.extend(self.mean_model.get_optimizable_parameters())
 
-            optimize(optim, loss_closure, "univariate model")
+        optim = torch.optim.LBFGS(
+            model_parameters + self.distribution.get_optimizable_parameters(),
+            max_iter=constants.PROGRESS_ITERATIONS,
+            lr=constants.LEARNING_RATE,
+            line_search_fn="strong_wolfe",
+        )
 
-            self.distribution.log_parameters()
-            self.mean_model.log_parameters()
-            self.log_parameters()
+        def loss_closure() -> float:
+            if constants.DEBUG:  # pragma: no cover
+                self.log_parameters()
+            optim.zero_grad()
+            loss = -self.__mean_log_likelihood(observations)
+            loss.backward()
+            return float(loss)
+
+        optimize(optim, loss_closure, "univariate model")
+
+        self.distribution.log_parameters()
+        self.mean_model.log_parameters()
+        self.log_parameters()
 
     @torch.no_grad()
     def predict(
@@ -225,13 +235,6 @@ class UnivariateUnitScalingModel(UnivariateScalingModel):
         device: Optional[torch.device] = None,
         mean_model: MeanModel = ZeroMeanModel(),
     ):
-        if not isinstance(mean_model, ZeroMeanModel):
-            raise ValueError(
-                f"Mean model: {type(mean_model)} Don't use a mean model "
-                " having parameters with a parameterless scaling model. "
-                "Change the mean model to ZeroMeanModel() or change the "
-                "univariate model to something with parameters."
-            )
         self.device = device
         self.distribution = distribution
         self.distribution.set_device(device)
@@ -250,6 +253,10 @@ class UnivariateUnitScalingModel(UnivariateScalingModel):
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         return []
+
+    @property
+    def is_optimizable(self) -> bool:
+        return False
 
     def log_parameters(self) -> None:
         pass
@@ -380,6 +387,10 @@ class UnivariateARCHModel(UnivariateScalingModel):
             "d": safe_value(self.d),
             "sample_scale": self.sample_scale,
         }
+
+    @property
+    def is_optimizable(self) -> bool:
+        return True
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         if self.a is None or self.b is None or self.c is None or self.d is None:
