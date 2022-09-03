@@ -59,6 +59,9 @@ def test_unit_scaling_model():
     with pytest.raises(ValueError):
         model.sample(10)
 
+    with pytest.raises(ValueError):
+        model.fit(observations)
+
     utils.set_and_check_parameters(model, observations, {"n": N}, 0, 0)
 
     check_constant_prediction(

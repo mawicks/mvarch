@@ -208,6 +208,7 @@ class UnivariateScalingModel(Protocol):
         """
 
         if isinstance(n, int):
+            print(self.n)
             if not isinstance(self.n, int):
                 raise ValueError("Model has not been trained/initialized")
             n = self.distribution.get_instance().sample((n, self.n))
