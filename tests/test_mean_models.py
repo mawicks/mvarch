@@ -31,7 +31,7 @@ def test_zero_mean_model():
 
     mean_model = ZeroMeanModel()
 
-    utils.set_and_check_parameters(mean_model, observations, {}, 0, 0)
+    utils.set_and_check_parameters(mean_model, observations, {"dim": 3}, 1, 0)
 
     check_constant_prediction(
         mean_model, observations, torch.zeros(observations.shape[1])
@@ -45,6 +45,7 @@ def test_zero_mean_model():
 
 
 CONSTANT_MEAN_VALUE = {"mu": [0.001, 0.002, 0.003]}
+INVALID_CONSTANT_MEAN_VALUE = {"mu": [[1, 2], [3, 4]]}
 
 
 def test_constant_mean_model():
@@ -69,6 +70,9 @@ def test_constant_mean_model():
         mean_model.sample(noise, initial_mean=None)
 
     mean_model.log_parameters()
+
+    with pytest.raises(ValueError):
+        mean_model.set_parameters(**INVALID_CONSTANT_MEAN_VALUE)
 
 
 ARMA_VALID_PARAMETERS = {

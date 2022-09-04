@@ -53,7 +53,6 @@ class UnivariateScalingModel(Protocol):
     device: Optional[torch.device]
     distribution: Distribution
     mean_model: MeanModel
-    n: Optional[int]
 
     @abstractmethod
     def initialize_parameters(self, observations: torch.Tensor) -> None:
@@ -61,6 +60,11 @@ class UnivariateScalingModel(Protocol):
 
     @abstractmethod
     def set_parameters(self, **kwargs) -> None:
+        """Abstract method with no implementation."""
+
+    @property
+    @abstractmethod
+    def dimension(self) -> Optional[int]:
         """Abstract method with no implementation."""
 
     @abstractmethod
@@ -208,10 +212,10 @@ class UnivariateScalingModel(Protocol):
         """
 
         if isinstance(n, int):
-            print(self.n)
-            if not isinstance(self.n, int):
+            dim = self.dimension
+            if not isinstance(dim, int):
                 raise ValueError("Model has not been trained/initialized")
-            n = self.distribution.get_instance().sample((n, self.n))
+            n = self.distribution.get_instance().sample((n, dim))
 
         scale = self._predict(n, sample=True, scale_initial_value=scale_initial_value)[
             0
@@ -226,9 +230,11 @@ class UnivariateScalingModel(Protocol):
 
 class UnivariateUnitScalingModel(UnivariateScalingModel):
     distribution: Distribution
-    device: Optional[torch.device]
     mean_model: MeanModel
-    n: Optional[int]
+
+    device: Optional[torch.device]
+
+    __dim: Optional[int]
 
     def __init__(
         self,
@@ -240,17 +246,21 @@ class UnivariateUnitScalingModel(UnivariateScalingModel):
         self.distribution = distribution
         self.distribution.set_device(device)
         self.mean_model = mean_model
-        self.n = None
+        self.__dim = None
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        self.n = observations.shape[1]
+        self.__dim = observations.shape[1]
 
     def set_parameters(self, **kwargs) -> None:
-        # Require that `n` be passed since there's no way to infer it.
-        self.n = kwargs["n"]
+        # Require that `dim` be passed since there's no way to infer it.
+        self.__dim = kwargs["dim"]
+
+    @property
+    def dimension(self) -> Optional[int]:
+        return self.__dim
 
     def get_parameters(self) -> Dict[str, Any]:
-        return {}
+        return {"dim": self.__dim}
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         return []
@@ -303,7 +313,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
     d: Optional[Parameter]
     sample_scale: Optional[torch.Tensor]
 
-    n: Optional[int]
+    __dim: Optional[int]
 
     def __init__(
         self,
@@ -311,7 +321,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         device: Optional[torch.device] = None,
         mean_model: MeanModel = ZeroMeanModel(),
     ):
-        self.a = self.b = self.c = self.d = None
+        self.__dim = self.a = self.b = self.c = self.d = None
         self.sample_scale = None
         self.distribution = distribution
         self.distribution.set_device(device)
@@ -319,13 +329,15 @@ class UnivariateARCHModel(UnivariateScalingModel):
         self.mean_model = mean_model
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        n = observations.shape[1]
-        self.a = DiagonalParameter(n, 1.0 - constants.INITIAL_DECAY, device=self.device)
-        self.b = DiagonalParameter(n, constants.INITIAL_DECAY, device=self.device)
-        self.c = DiagonalParameter(n, 1.0, device=self.device)
-        self.d = DiagonalParameter(n, 1.0, device=self.device)
+        dim = observations.shape[1]
+        self.a = DiagonalParameter(
+            dim, 1.0 - constants.INITIAL_DECAY, device=self.device
+        )
+        self.b = DiagonalParameter(dim, constants.INITIAL_DECAY, device=self.device)
+        self.c = DiagonalParameter(dim, 1.0, device=self.device)
+        self.d = DiagonalParameter(dim, 1.0, device=self.device)
         self.sample_scale = torch.std(observations, dim=0)
-        self.n = n
+        self.__dim = dim
 
     def set_parameters(self, **kwargs: Any) -> None:
         a = kwargs["a"]
@@ -369,15 +381,19 @@ class UnivariateARCHModel(UnivariateScalingModel):
                 "only and only one dimension that's consistent"
             )
 
-        n = a.shape[0]
-        self.a = DiagonalParameter(n).set(a)
-        self.b = DiagonalParameter(n).set(b)
-        self.c = DiagonalParameter(n).set(c)
-        self.d = DiagonalParameter(n).set(d)
+        dim = a.shape[0]
+        self.a = DiagonalParameter(dim).set(a)
+        self.b = DiagonalParameter(dim).set(b)
+        self.c = DiagonalParameter(dim).set(c)
+        self.d = DiagonalParameter(dim).set(d)
 
         self.sample_scale = sample_scale
 
-        self.n = n
+        self.__dim = dim
+
+    @property
+    def dimension(self) -> Optional[int]:
+        return self.__dim
 
     def get_parameters(self) -> Dict[str, Any]:
         safe_value = lambda x: x.value.detach().numpy() if x is not None else None

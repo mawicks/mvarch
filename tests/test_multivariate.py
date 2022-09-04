@@ -28,6 +28,7 @@ from . import utils
 # We use a dimension of two with independent values because otherwise we wouldn't catch
 # transpose errors or stacking errors for example.
 MVARCH_VALID_PARAMETERS = {
+    "dim": 2,
     "a": [2, 3],
     "b": [5, 7],
     "c": [11, 13],
@@ -64,6 +65,7 @@ SAMPLE_PREDICTED_SCALE_SQUARED = [[36609878, 128824493], [128824493, 453772904]]
 
 # Here's a set of parameters that are not valid because their dimensions do not conform
 MVARCH_INVALID_PARAMETERS1 = {
+    "dim": 2,
     "a": [0.8, 0.7, 0.6],
     "b": [0.1, 0.2, 0.3, 0.4],
     "c": [0.03, 0.07, 0.11],
@@ -71,41 +73,55 @@ MVARCH_INVALID_PARAMETERS1 = {
     "sample_scale": [0.001, 0.002, 0.003],
 }
 MVARCH_INVALID_PARAMETERS2 = {
+    "dim": 2,
     "a": [0.8, 0.7],
     "b": [0.1, 0.2],
     "c": [0.03, 0.07],
     "d": [2.0, 2.0],
     "sample_scale": [0.001, 0.002],
 }
+
 MVARCH_INVALID_PARAMETERS = [MVARCH_INVALID_PARAMETERS1, MVARCH_INVALID_PARAMETERS2]
 
 
-def test_mvarch_model():
-    default_initial_value = torch.tensor(
-        MVARCH_DEFAULT_INITIAL_VALUE, dtype=torch.float
-    )
-    observations = torch.tensor(MVARCH_CENTERED_OBSERVATIONS, dtype=torch.float)
-    # For now, also use observations as the nois einput when sample=True.
-    noise = observations
+@pytest.fixture
+def multivariate_arch_model():
+    return MultivariateARCHModel(constraint=ParameterConstraint.DIAGONAL)
 
+
+def test_can_create_with_all_constraints():
     # Create a MV model with diagonal parmaeters.
     # For coverage, make sure we can construct a model with each possible parameter type:
 
     for constraint in ParameterConstraint.__members__.values():
         model = MultivariateARCHModel(constraint=constraint)
 
-    model = MultivariateARCHModel(constraint=ParameterConstraint.DIAGONAL)
 
+def test_unitialized_multivariate_arch_model_get_raises(multivariate_arch_model):
     with pytest.raises(RuntimeError):
-        model.get_optimizable_parameters()
+        multivariate_arch_model.get_optimizable_parameters()
 
+
+def test_unitialized_multivariate_arch_model_sample_raises(multivariate_arch_model):
+    observations = torch.tensor(MVARCH_CENTERED_OBSERVATIONS, dtype=torch.float)
     with pytest.raises(RuntimeError):
-        model.sample(observations)
+        multivariate_arch_model.sample(observations)
 
-    utils.set_and_check_parameters(model, observations, MVARCH_VALID_PARAMETERS, 5, 4)
+
+def test_mvarch_model(multivariate_arch_model):
+    default_initial_value = torch.tensor(
+        MVARCH_DEFAULT_INITIAL_VALUE, dtype=torch.float
+    )
+    observations = torch.tensor(MVARCH_CENTERED_OBSERVATIONS, dtype=torch.float)
+    # For now, also use observations as the noise input when sample=True.
+    noise = observations
+
+    utils.set_and_check_parameters(
+        multivariate_arch_model, observations, MVARCH_VALID_PARAMETERS, 6, 4
+    )
 
     # Case 1: _predict with sample=False and specified initial value
-    scale = model._predict(
+    scale = multivariate_arch_model._predict(
         observations, scale_initial_value=MVARCH_SCALE_INITIAL_VALUE
     )[0]
 
@@ -120,7 +136,7 @@ def test_mvarch_model():
     )
 
     # Case 2: _predict with sample=True and specified initial value
-    sample_scale = model._predict(
+    sample_scale = multivariate_arch_model._predict(
         observations, sample=True, scale_initial_value=MVARCH_SCALE_INITIAL_VALUE
     )[0]
 
@@ -138,7 +154,7 @@ def test_mvarch_model():
     )
 
     # Case 3: _predict with sample=False and using default initial value.
-    scale = model._predict(observations)[0]
+    scale = multivariate_arch_model._predict(observations)[0]
 
     assert utils.tensors_about_equal(
         scale[0, :], torch.tensor(MVARCH_DEFAULT_INITIAL_VALUE)
@@ -147,10 +163,10 @@ def test_mvarch_model():
     # For coverage, try several bad parameter values with gates:
     for p in MVARCH_INVALID_PARAMETERS:
         with pytest.raises(ValueError):
-            model.set_parameters(**p)
+            multivariate_arch_model.set_parameters(**p)
 
     with pytest.raises(ValueError):
-        model._predict(
+        multivariate_arch_model._predict(
             observations, scale_initial_value=MVARCH_INVALID_SCALE_INITIAL_VALUE
         )
 

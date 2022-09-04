@@ -17,6 +17,8 @@ from .parameters import (
     FullParameter,
 )
 
+from .distributions import Distribution
+
 from .univariate_models import (
     UnivariateScalingModel,
     UnivariateUnitScalingModel,
@@ -90,11 +92,18 @@ def joint_conditional_log_likelihood(
 
 class MultivariateARCHModel:
     parameter_type: Type[Parameter]
+    constraint: ParameterConstraint
+    univariate_model: UnivariateScalingModel
+    distribution: Distribution
+
+    device: Optional[torch.device]
 
     a: Optional[Parameter]
     b: Optional[Parameter]
     c: Optional[Parameter]
     d: Optional[Parameter]
+
+    __dim: Optional[int]
 
     def __init__(
         self,
@@ -110,10 +119,12 @@ class MultivariateARCHModel:
         self.distribution.set_device(device)
         self.device = device
 
+        self.a = self.b = self.c = self.d = self.__dim = None
+
         # There should be a better way to do this.  Maybe add a set_device method.
         self.univariate_model.device = device
 
-        self.a = self.b = self.c = self.d = None
+        self.__dim = self.a = self.b = self.c = self.d = None
 
         if constraint == ParameterConstraint.SCALAR:
             self.parameter_type = ScalarParameter
@@ -127,12 +138,14 @@ class MultivariateARCHModel:
     def initialize_parameters(
         self, unscaled_centered_observations: torch.Tensor
     ) -> None:
-        n = unscaled_centered_observations.shape[1]
+        dim = unscaled_centered_observations.shape[1]
         # Initialize a and b as simple multiples of the identity
-        self.a = self.parameter_type(n, 1.0 - constants.INITIAL_DECAY, self.device)
-        self.b = self.parameter_type(n, constants.INITIAL_DECAY, self.device)
-        self.c = self.parameter_type(n, 0.01, self.device)
-        self.d = self.parameter_type(n, 1.0, self.device)
+        self.a = self.parameter_type(dim, 1.0 - constants.INITIAL_DECAY, self.device)
+        self.b = self.parameter_type(dim, constants.INITIAL_DECAY, self.device)
+        self.c = self.parameter_type(dim, 0.01, self.device)
+        self.d = self.parameter_type(dim, 1.0, self.device)
+
+        self.__dim = dim
 
         # Recenter. This is important when the centering in the caller
         # was done with initialized but untuned means.
@@ -150,7 +163,9 @@ class MultivariateARCHModel:
             / torch.sqrt(torch.tensor(unscaled_centered_observations.shape[0]))
         )
 
-    def set_parameters(self, a: Any, b: Any, c: Any, d: Any, sample_scale: Any) -> None:
+    def set_parameters(
+        self, dim: int, a: Any, b: Any, c: Any, d: Any, sample_scale: Any
+    ) -> None:
         if not isinstance(a, torch.Tensor):
             a = torch.tensor(
                 a, dtype=torch.float, device=self.device, requires_grad=True
@@ -186,17 +201,24 @@ class MultivariateARCHModel:
                 f"conform with parameter shapes ({a.shape})"
             )
 
-        n = a.shape[0]
-        self.a = self.parameter_type(n).set(a)
-        self.b = self.parameter_type(n).set(b)
-        self.c = self.parameter_type(n).set(c)
-        self.d = self.parameter_type(n).set(d)
+        p_dim = a.shape[0]
+        self.a = self.parameter_type(p_dim).set(a)
+        self.b = self.parameter_type(p_dim).set(b)
+        self.c = self.parameter_type(p_dim).set(c)
+        self.d = self.parameter_type(p_dim).set(d)
 
         self.sample_scale = sample_scale
+
+        self.__dim = dim
+
+    @property
+    def dimension(self):
+        return self.__dim
 
     def get_parameters(self) -> Dict[str, Any]:
         safe_value = lambda x: x.value.detach().numpy() if x is not None else None
         return {
+            "dim": self.__dim,
             "a": safe_value(self.a),
             "b": safe_value(self.b),
             "c": safe_value(self.c),
@@ -569,6 +591,7 @@ if __name__ == "__main__":  # pragma: no cover
         constraint=ParameterConstraint.TRIANGULAR
     )
     multivariate_model.set_parameters(
+        dim=3,
         a=[[0.92, 0.0, 0.0], [-0.03, 0.95, 0.0], [-0.04, -0.02, 0.97]],
         b=[[0.4, 0.0, 0.0], [0.1, 0.3, 0.0], [0.13, 0.08, 0.2]],
         c=[[0.07, 0.0, 0.0], [0.04, 0.1, 0.0], [0.05, 0.005, 0.08]],

@@ -48,24 +48,36 @@ def check_constant_prediction(
     )
 
 
-def test_unit_scaling_model():
+@pytest.fixture
+def univariate_unit_scaling_model():
+    return UnivariateUnitScalingModel()
+
+
+def test_unitialized_unit_scaling_model_sample_raises(univariate_unit_scaling_model):
+    with pytest.raises(ValueError):
+        univariate_unit_scaling_model.sample(10)
+
+
+def test_unit_scaling_model_fit_raises(univariate_unit_scaling_model):
+    N = 3
+    observations = torch.randn((10, N), dtype=torch.float)
+    with pytest.raises(ValueError):
+        univariate_unit_scaling_model.fit(observations)
+
+
+def test_unit_scaling_model_operates_sanely(univariate_unit_scaling_model):
     N = 3
     observations = torch.randn((10, N), dtype=torch.float)
     noise = torch.randn(observations.shape, dtype=torch.float)
-    model = UnivariateUnitScalingModel()
 
-    assert model.is_optimizable == False
+    assert univariate_unit_scaling_model.is_optimizable == False
 
-    with pytest.raises(ValueError):
-        model.sample(10)
-
-    with pytest.raises(ValueError):
-        model.fit(observations)
-
-    utils.set_and_check_parameters(model, observations, {"n": N}, 0, 0)
+    utils.set_and_check_parameters(
+        univariate_unit_scaling_model, observations, {"dim": N}, 1, 0
+    )
 
     check_constant_prediction(
-        model,
+        univariate_unit_scaling_model,
         observations,
         torch.ones(observations.shape[1], dtype=torch.float),
         torch.zeros(observations.shape[1], dtype=torch.float),
@@ -120,25 +132,36 @@ ARCH_INVALID_PARAMETERS = {
 }
 
 
-def test_arch_model():
+@pytest.fixture
+def univariate_arch_model():
+    return UnivariateARCHModel()
+
+
+def test_uninitialized_arch_model_get_optimizable_raises(univariate_arch_model):
+    with pytest.raises(RuntimeError):
+        univariate_arch_model.get_optimizable_parameters()
+
+
+def test_uninitialized_arch_model_sample_raises(univariate_arch_model):
+    observations = torch.tensor(ARCH_CENTERED_OBSERVATIONS, dtype=torch.float)
+    with pytest.raises(RuntimeError):
+        univariate_arch_model.sample(observations)
+
+
+def test_arch_model(univariate_arch_model):
     default_initial_value = torch.tensor(ARCH_DEFAULT_INITIAL_VALUE, dtype=torch.float)
     observations = torch.tensor(ARCH_CENTERED_OBSERVATIONS, dtype=torch.float)
     # For now, also use observations as the nois einput when sample=True.
     noise = observations
 
-    model = UnivariateARCHModel()
-    assert model.is_optimizable == True
+    assert univariate_arch_model.is_optimizable == True
 
-    with pytest.raises(RuntimeError):
-        model.get_optimizable_parameters()
-
-    with pytest.raises(RuntimeError):
-        model.sample(observations)
-
-    utils.set_and_check_parameters(model, observations, ARCH_VALID_PARAMETERS, 5, 4)
+    utils.set_and_check_parameters(
+        univariate_arch_model, observations, ARCH_VALID_PARAMETERS, 5, 4
+    )
 
     # Case 1: _predict with sample=False and specified initial value
-    scale, scale_next = model._predict(
+    scale, scale_next = univariate_arch_model._predict(
         observations, scale_initial_value=ARCH_SCALE_INITIAL_VALUE
     )
     assert utils.tensors_about_equal(
@@ -154,7 +177,7 @@ def test_arch_model():
     print("scale_next**2: ", scale_next**2)
 
     # Case 2: _predict with sample=True and specified initial value
-    sample_scale, sample_scale_next = model._predict(
+    sample_scale, sample_scale_next = univariate_arch_model._predict(
         observations, sample=True, scale_initial_value=ARCH_SCALE_INITIAL_VALUE
     )
     assert utils.tensors_about_equal(
@@ -170,13 +193,13 @@ def test_arch_model():
     print("sample_scale_next**2: ", sample_scale_next**2)
 
     # Case 3: _predict with sample=False and using default initial value.
-    scale, scale_next = model._predict(observations)
+    scale, scale_next = univariate_arch_model._predict(observations)
     assert utils.tensors_about_equal(
         scale[0, :], torch.tensor(ARCH_DEFAULT_INITIAL_VALUE)
     )
 
     with pytest.raises(ValueError):
-        model.set_parameters(**ARCH_INVALID_PARAMETERS)
+        univariate_arch_model.set_parameters(**ARCH_INVALID_PARAMETERS)
 
 
 def test_marginal_likelihood():

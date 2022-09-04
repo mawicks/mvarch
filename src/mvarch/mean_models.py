@@ -23,6 +23,11 @@ class MeanModel(Protocol):
     def set_parameters(self, **kwargs: Any) -> None:
         """Abstract method with no implementation."""
 
+    @property
+    @abstractmethod
+    def dimension(self) -> Optional[int]:
+        """Abstract method with no implementation."""
+
     @abstractmethod
     def get_parameters(self) -> Dict[str, Any]:
         """Abstract method with no implementation."""
@@ -81,20 +86,28 @@ class MeanModel(Protocol):
 
 
 class ZeroMeanModel(MeanModel):
+    __dim: Optional[int]
+
     def __init__(
         self,
         device: Optional[torch.device] = None,
     ):
         self.device = device
+        self.__dim = None
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        pass
+        self.__dim = observations.shape[1]
 
     def set_parameters(self, **kwargs: Any) -> None:
-        pass
+        dim = kwargs["dim"]
+        self.__dim = dim
+
+    @property
+    def dimension(self) -> Optional[int]:
+        return self.__dim
 
     def get_parameters(self) -> Dict[str, Any]:
-        return {}
+        return {"dim": self.__dim}
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         return []
@@ -153,7 +166,14 @@ class ConstantMeanModel(MeanModel):
             mu = torch.tensor(
                 mu, dtype=torch.float, device=self.device, requires_grad=True
             )
+        if len(mu.shape) != 1:
+            raise ValueError(f"Parameter `mu` must be a vector: {mu}")
+
         self.mu = mu
+
+    @property
+    def dimension(self) -> Optional[int]:
+        return self.mu.shape[0] if self.mu is not None else None
 
     def get_parameters(self) -> Dict[str, Any]:
         return {"mu": self.mu.detach().numpy() if self.mu is not None else None}
@@ -205,23 +225,29 @@ class ARMAMeanModel(MeanModel):
     c: Optional[Parameter]
     d: Optional[Parameter]
     sample_mean: Optional[torch.Tensor]
+
+    __dim: Optional[int]
+
     device: Optional[torch.device]
 
     def __init__(
         self,
         device: Optional[torch.device] = None,
     ):
-        self.a = self.b = self.c = self.d = None
+        self.__dim = self.a = self.b = self.c = self.d = None
         self.sample_mean = None
         self.device = device
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        n = observations.shape[1]
-        self.a = DiagonalParameter(n, 1.0 - constants.INITIAL_DECAY, device=self.device)
-        self.b = DiagonalParameter(n, constants.INITIAL_DECAY, device=self.device)
-        self.c = DiagonalParameter(n, 1.0, device=self.device)
-        self.d = DiagonalParameter(n, 1.0, device=self.device)
+        dim = observations.shape[1]
+        self.a = DiagonalParameter(
+            dim, 1.0 - constants.INITIAL_DECAY, device=self.device
+        )
+        self.b = DiagonalParameter(dim, constants.INITIAL_DECAY, device=self.device)
+        self.c = DiagonalParameter(dim, 1.0, device=self.device)
+        self.d = DiagonalParameter(dim, 1.0, device=self.device)
         self.sample_mean = torch.mean(observations, dim=0)
+        self.__dim = dim
 
     def set_parameters(self, **kwargs: Any) -> None:
         a = kwargs["a"]
@@ -265,13 +291,19 @@ class ARMAMeanModel(MeanModel):
                 "only and only one dimension that's consistent"
             )
 
-        n = a.shape[0]
-        self.a = DiagonalParameter(n).set(a)
-        self.b = DiagonalParameter(n).set(b)
-        self.c = DiagonalParameter(n).set(c)
-        self.d = DiagonalParameter(n).set(d)
+        dim = a.shape[0]
+        self.a = DiagonalParameter(dim).set(a)
+        self.b = DiagonalParameter(dim).set(b)
+        self.c = DiagonalParameter(dim).set(c)
+        self.d = DiagonalParameter(dim).set(d)
 
         self.sample_mean = sample_mean
+
+        self.__dim = dim
+
+    @property
+    def dimension(self) -> Optional[int]:
+        return self.__dim
 
     def get_parameters(self) -> Dict[str, Any]:
         safe_value = lambda x: x.value.detach().numpy() if x is not None else None
