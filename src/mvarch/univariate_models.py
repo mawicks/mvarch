@@ -350,10 +350,10 @@ class UnivariateARCHModel(UnivariateScalingModel):
         d = kwargs["d"]
         sample_scale = kwargs["sample_scale"]
 
-        a = to_tensor(a, device=self.device)
-        b = to_tensor(b, device=self.device)
-        c = to_tensor(c, device=self.device)
-        d = to_tensor(d, device=self.device)
+        a = to_tensor(a, device=self.device, requires_grad=True)
+        b = to_tensor(b, device=self.device, requires_grad=True)
+        c = to_tensor(c, device=self.device, requires_grad=True)
+        d = to_tensor(d, device=self.device, requires_grad=True)
         sample_scale = to_tensor(sample_scale, device=self.device)
 
         if (
@@ -442,7 +442,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         if self.a is None or self.b is None or self.c is None or self.d is None:
             raise RuntimeError("Model has not been fit()")
 
-        if scale_initial_value:
+        if scale_initial_value is not None:
             scale_initial_value = to_tensor(scale_initial_value, device=self.device)
             scale_t = scale_initial_value
         else:

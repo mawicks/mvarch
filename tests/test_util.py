@@ -54,7 +54,20 @@ def test_rename_column(test_input, expected_output):
     assert util.rename_column(test_input) == expected_output
 
 
-@pytest.mark.parametrize("test_input", [4.0, [[1.0, 2.0], [3.0, 4.0]]])
+@pytest.mark.parametrize(
+    "test_input",
+    [
+        4.0,
+        [[1.0, 2.0], [3.0, 4.0]],
+        torch.tensor([1.0]),
+        torch.tensor([2.0], requires_grad=True),
+    ],
+)
 def test_to_tensor(test_input):
-    result = util.to_tensor(test_input)
+    result = util.to_tensor(test_input, requires_grad=False)
     assert isinstance(result, torch.Tensor)
+    assert hasattr(result, "requires_grad") is False or result.requires_grad is False
+
+    result = util.to_tensor(test_input, requires_grad=True)
+    assert isinstance(result, torch.Tensor)
+    assert result.requires_grad == True

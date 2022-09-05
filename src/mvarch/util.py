@@ -22,9 +22,17 @@ def to_symbol_list(symbols: Union[Iterable[str], str]) -> List[str]:
     return list(map(str.upper, symbols))
 
 
-def to_tensor(tensor_like: Any, device: Optional[torch.device] = None):
-    if not isinstance(tensor_like, torch.Tensor):
-        tensor_like = torch.tensor(tensor_like, dtype=torch.float, device=device)
+def to_tensor(
+    tensor_like: Any, device: Optional[torch.device] = None, requires_grad: bool = False
+):
+    if isinstance(tensor_like, torch.Tensor):
+        tensor_like = tensor_like.detach()
+        if requires_grad:
+            tensor_like.requires_grad = requires_grad
+    else:
+        tensor_like = torch.tensor(
+            tensor_like, dtype=torch.float, device=device, requires_grad=requires_grad
+        )
     return tensor_like
 
 

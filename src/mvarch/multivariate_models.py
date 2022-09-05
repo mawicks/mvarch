@@ -167,10 +167,10 @@ class MultivariateARCHModel:
     def set_parameters(
         self, dim: int, a: Any, b: Any, c: Any, d: Any, sample_scale: Any
     ) -> None:
-        a = to_tensor(a, device=self.device)
-        b = to_tensor(b, device=self.device)
-        c = to_tensor(c, device=self.device)
-        d = to_tensor(d, device=self.device)
+        a = to_tensor(a, device=self.device, requires_grad=True)
+        b = to_tensor(b, device=self.device, requires_grad=True)
+        c = to_tensor(c, device=self.device, requires_grad=True)
+        d = to_tensor(d, device=self.device, requires_grad=True)
         sample_scale = to_tensor(sample_scale, device=self.device)
 
         if a.shape != b.shape or a.shape != c.shape or a.shape != d.shape:
@@ -274,7 +274,7 @@ class MultivariateARCHModel:
             h: torch.Tensor of predictions for each observation
             h_next: torch.Tensor prediction for next unobserved value
         """
-        if scale_initial_value:
+        if scale_initial_value is not None:
             scale_initial_value = to_tensor(scale_initial_value, device=self.device)
 
             if (
@@ -533,6 +533,7 @@ class MultivariateARCHModel:
         n: Union[torch.Tensor, int],
         mv_scale_initial_value: Any = None,
         uv_scale_initial_value: Any = None,
+        mean_initial_value: Any = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Generate a random sampled output from the model.
@@ -565,7 +566,9 @@ class MultivariateARCHModel:
         mv_scaled_noise = (mv_scale @ n.unsqueeze(2)).squeeze(2)
 
         output, uv_scale, uv_mean = self.univariate_model.sample(
-            mv_scaled_noise, uv_scale_initial_value
+            mv_scaled_noise,
+            scale_initial_value=uv_scale_initial_value,
+            mean_initial_value=mean_initial_value,
         )
 
         return output, mv_scale, uv_scale, uv_mean

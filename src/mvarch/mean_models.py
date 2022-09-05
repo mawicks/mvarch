@@ -12,6 +12,7 @@ from .parameters import (
     Parameter,
     DiagonalParameter,
 )
+from .util import to_tensor
 
 
 class MeanModel(Protocol):
@@ -162,10 +163,7 @@ class ConstantMeanModel(MeanModel):
 
     def set_parameters(self, **kwargs: Any) -> None:
         mu = kwargs["mu"]
-        if not isinstance(mu, torch.Tensor):
-            mu = torch.tensor(
-                mu, dtype=torch.float, device=self.device, requires_grad=True
-            )
+        mu = to_tensor(mu, device=self.device, requires_grad=True)
         if len(mu.shape) != 1:
             raise ValueError(f"Parameter `mu` must be a vector: {mu}")
 
