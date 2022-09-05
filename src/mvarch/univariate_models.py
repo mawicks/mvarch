@@ -443,7 +443,6 @@ class UnivariateARCHModel(UnivariateScalingModel):
             raise RuntimeError("Model has not been fit()")
 
         if scale_initial_value is not None:
-            scale_initial_value = to_tensor(scale_initial_value, device=self.device)
             scale_t = scale_initial_value
         else:
             scale_t = self.d @ self.sample_scale  # type: ignore

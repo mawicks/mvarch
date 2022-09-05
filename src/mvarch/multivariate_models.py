@@ -258,7 +258,7 @@ class MultivariateARCHModel:
     def _predict(
         self,
         observations: torch.Tensor,
-        sample=False,
+        sample: bool = False,
         scale_initial_value=None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given a, b, c, d, and observations, generate the *estimated*
@@ -275,8 +275,6 @@ class MultivariateARCHModel:
             h_next: torch.Tensor prediction for next unobserved value
         """
         if scale_initial_value is not None:
-            scale_initial_value = to_tensor(scale_initial_value, device=self.device)
-
             if (
                 len(scale_initial_value.shape) != 2
                 or scale_initial_value.shape[0] != scale_initial_value.shape[1]

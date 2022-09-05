@@ -150,6 +150,7 @@ def test_uninitialized_arch_model_sample_raises(univariate_arch_model):
 
 def test_arch_model(univariate_arch_model):
     default_initial_value = torch.tensor(ARCH_DEFAULT_INITIAL_VALUE, dtype=torch.float)
+    arch_scale_initial_value = torch.tensor(ARCH_SCALE_INITIAL_VALUE, dtype=torch.float)
     observations = torch.tensor(ARCH_CENTERED_OBSERVATIONS, dtype=torch.float)
     # For now, also use observations as the nois einput when sample=True.
     noise = observations
@@ -162,7 +163,7 @@ def test_arch_model(univariate_arch_model):
 
     # Case 1: _predict with sample=False and specified initial value
     scale, scale_next = univariate_arch_model._predict(
-        observations, scale_initial_value=ARCH_SCALE_INITIAL_VALUE
+        observations, scale_initial_value=arch_scale_initial_value
     )
     assert utils.tensors_about_equal(
         scale, torch.tensor(PREDICTED_SCALE, dtype=torch.float)
@@ -178,7 +179,7 @@ def test_arch_model(univariate_arch_model):
 
     # Case 2: _predict with sample=True and specified initial value
     sample_scale, sample_scale_next = univariate_arch_model._predict(
-        observations, sample=True, scale_initial_value=ARCH_SCALE_INITIAL_VALUE
+        observations, sample=True, scale_initial_value=arch_scale_initial_value
     )
     assert utils.tensors_about_equal(
         sample_scale, torch.tensor(SAMPLE_PREDICTED_SCALE, dtype=torch.float)

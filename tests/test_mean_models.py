@@ -115,6 +115,8 @@ ARMA_INVALID_PARAMETERS = {
 
 def test_ARMA_mean_model():
     default_initial_value = torch.tensor(DEFAULT_INITIAL_VALUE)
+    arma_mean_initial_value = torch.tensor(ARMA_MEAN_INITIAL_VALUE)
+
     observations = torch.tensor(ARMA_OBSERVATIONS)
     # For now, also use observations as the nois einput when sample=True.
     noise = observations
@@ -142,7 +144,7 @@ def test_ARMA_mean_model():
     # CASE 1: Specified parameters, specified input, and specified initial value.
 
     means, next_mean = mean_model._predict(
-        observations, sample=False, mean_initial_value=ARMA_MEAN_INITIAL_VALUE
+        observations, sample=False, mean_initial_value=arma_mean_initial_value
     )
     assert utils.tensors_about_equal(means, predicted_means)
     assert utils.tensors_about_equal(next_mean, next_predicted_mean)
@@ -157,7 +159,7 @@ def test_ARMA_mean_model():
     # value, and sample == True
 
     means, next_mean = mean_model._predict(
-        observations, sample=True, mean_initial_value=ARMA_MEAN_INITIAL_VALUE
+        observations, sample=True, mean_initial_value=arma_mean_initial_value
     )
     assert utils.tensors_about_equal(means, sample_predicted_means)
     assert utils.tensors_about_equal(next_mean, sample_next_predicted_mean)

@@ -112,6 +112,9 @@ def test_mvarch_model(multivariate_arch_model):
     default_initial_value = torch.tensor(
         MVARCH_DEFAULT_INITIAL_VALUE, dtype=torch.float
     )
+    mvarch_scale_initial_value = torch.tensor(
+        MVARCH_SCALE_INITIAL_VALUE, dtype=torch.float
+    )
     observations = torch.tensor(MVARCH_CENTERED_OBSERVATIONS, dtype=torch.float)
     # For now, also use observations as the noise input when sample=True.
     noise = observations
@@ -122,14 +125,12 @@ def test_mvarch_model(multivariate_arch_model):
 
     # Case 1: _predict with sample=False and specified initial value
     scale = multivariate_arch_model._predict(
-        observations, scale_initial_value=MVARCH_SCALE_INITIAL_VALUE
+        observations, scale_initial_value=mvarch_scale_initial_value
     )[0]
 
     print("_predict() with sample=False")
 
-    assert utils.tensors_about_equal(
-        scale[0], torch.tensor(MVARCH_SCALE_INITIAL_VALUE, dtype=torch.float)
-    )
+    assert utils.tensors_about_equal(scale[0], mvarch_scale_initial_value)
 
     assert utils.tensors_about_equal(
         scale[1] @ scale[1].T, torch.tensor(PREDICTED_SCALE_SQUARED, dtype=torch.float)
@@ -137,14 +138,12 @@ def test_mvarch_model(multivariate_arch_model):
 
     # Case 2: _predict with sample=True and specified initial value
     sample_scale = multivariate_arch_model._predict(
-        observations, sample=True, scale_initial_value=MVARCH_SCALE_INITIAL_VALUE
+        observations, sample=True, scale_initial_value=mvarch_scale_initial_value
     )[0]
 
     print("_predict() with sample=True")
 
-    assert utils.tensors_about_equal(
-        sample_scale[0], torch.tensor(MVARCH_SCALE_INITIAL_VALUE, dtype=torch.float)
-    )
+    assert utils.tensors_about_equal(sample_scale[0], mvarch_scale_initial_value)
 
     sample_scale_squared = sample_scale[1] @ sample_scale[1].T
     assert utils.tensors_about_equal(
@@ -156,9 +155,7 @@ def test_mvarch_model(multivariate_arch_model):
     # Case 3: _predict with sample=False and using default initial value.
     scale = multivariate_arch_model._predict(observations)[0]
 
-    assert utils.tensors_about_equal(
-        scale[0, :], torch.tensor(MVARCH_DEFAULT_INITIAL_VALUE)
-    )
+    assert utils.tensors_about_equal(scale[0, :], default_initial_value)
 
     # For coverage, try several bad parameter values with gates:
     for p in MVARCH_INVALID_PARAMETERS:
@@ -167,7 +164,8 @@ def test_mvarch_model(multivariate_arch_model):
 
     with pytest.raises(ValueError):
         multivariate_arch_model._predict(
-            observations, scale_initial_value=MVARCH_INVALID_SCALE_INITIAL_VALUE
+            observations,
+            scale_initial_value=torch.tensor(MVARCH_INVALID_SCALE_INITIAL_VALUE),
         )
 
 

@@ -46,7 +46,7 @@ class MeanModel(Protocol):
         self,
         observations: torch.Tensor,
         sample: bool = False,
-        mean_initial_value: Union[torch.Tensor, Any, None] = None,
+        mean_initial_value: Union[torch.Tensor, None] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given a, b, c, d, and observations, generate the *estimated*
         standard deviations (marginal) for each observation
@@ -120,7 +120,7 @@ class ZeroMeanModel(MeanModel):
         self,
         observations: torch.Tensor,
         sample: bool = False,
-        mean_initial_value: Union[torch.Tensor, Any, None] = None,
+        mean_initial_value: Union[torch.Tensor, None] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given a, b, c, d, and observations, generate the *estimated*
         standard deviations (marginal) for each observation
@@ -190,7 +190,7 @@ class ConstantMeanModel(MeanModel):
         self,
         observations: torch.Tensor,
         sample: bool = False,
-        mean_initial_value: Union[torch.Tensor, Any, None] = None,
+        mean_initial_value: Union[torch.Tensor, None] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given a, b, c, d, and observations, generate the *estimated*
         standard deviations (marginal) for each observation
@@ -336,8 +336,8 @@ class ARMAMeanModel(MeanModel):
     def _predict(
         self,
         observations: torch.Tensor,
-        sample=False,
-        mean_initial_value: Union[torch.Tensor, Any, None] = None,
+        sample: bool = False,
+        mean_initial_value: Union[torch.Tensor, None] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given a, b, c, d, and observations, generate the *estimated*
         standard deviations (marginal) for each observation
@@ -359,7 +359,6 @@ class ARMAMeanModel(MeanModel):
             raise RuntimeError("Mean model has not been initialized)")
 
         if mean_initial_value is not None:
-            mean_initial_value = to_tensor(mean_initial_value, device=self.device)
             mu_t = mean_initial_value
         else:
             mu_t = self.d @ self.sample_mean  # type: ignore
