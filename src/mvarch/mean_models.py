@@ -358,11 +358,8 @@ class ARMAMeanModel(MeanModel):
         if self.a is None or self.b is None or self.c is None or self.d is None:
             raise RuntimeError("Mean model has not been initialized)")
 
-        if mean_initial_value:
-            if not isinstance(mean_initial_value, torch.Tensor):
-                mean_initial_value = torch.tensor(
-                    mean_initial_value, dtype=torch.float, device=self.device
-                )
+        if mean_initial_value is not None:
+            mean_initial_value = to_tensor(mean_initial_value, device=self.device)
             mu_t = mean_initial_value
         else:
             mu_t = self.d @ self.sample_mean  # type: ignore
