@@ -15,6 +15,7 @@ from .parameters import (
     DiagonalParameter,
 )
 from .optimize import optimize
+from .util import to_tensor
 
 
 def marginal_conditional_log_likelihood(
@@ -113,6 +114,7 @@ class UnivariateScalingModel(Protocol):
         """
 
     def fit(self, observations: torch.Tensor) -> None:
+        observations = to_tensor(observations, device=self.device)
         self.distribution.log_parameters()
 
         self.mean_model.initialize_parameters(observations)
@@ -163,6 +165,7 @@ class UnivariateScalingModel(Protocol):
         This is the inference version of predict(), which is the version clients would normally use.
         It doesn't compute any gradient information, so it should be faster.
         """
+        observations = to_tensor(observations, device=self.device)
         mu, mu_next = self.mean_model.predict(observations, mean_initial_value)
         scale, scale_next = self._predict(observations - mu, scale_initial_value)
 
@@ -189,6 +192,7 @@ class UnivariateScalingModel(Protocol):
         the number of samples).
 
         """
+        observations = to_tensor(observations, device=self.device)
         return float(self.__mean_log_likelihood(observations))
 
     @torch.no_grad()
@@ -346,26 +350,11 @@ class UnivariateARCHModel(UnivariateScalingModel):
         d = kwargs["d"]
         sample_scale = kwargs["sample_scale"]
 
-        if not isinstance(a, torch.Tensor):
-            a = torch.tensor(
-                a, dtype=torch.float, device=self.device, requires_grad=True
-            )
-        if not isinstance(b, torch.Tensor):
-            b = torch.tensor(
-                b, dtype=torch.float, device=self.device, requires_grad=True
-            )
-        if not isinstance(c, torch.Tensor):
-            c = torch.tensor(
-                c, dtype=torch.float, device=self.device, requires_grad=True
-            )
-        if not isinstance(d, torch.Tensor):
-            d = torch.tensor(
-                d, dtype=torch.float, device=self.device, requires_grad=True
-            )
-        if not isinstance(sample_scale, torch.Tensor):
-            sample_scale = torch.tensor(
-                sample_scale, dtype=torch.float, device=self.device
-            )
+        a = to_tensor(a, device=self.device)
+        b = to_tensor(b, device=self.device)
+        c = to_tensor(c, device=self.device)
+        d = to_tensor(d, device=self.device)
+        sample_scale = to_tensor(sample_scale, device=self.device)
 
         if (
             len(a.shape) != 1
@@ -454,10 +443,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
             raise RuntimeError("Model has not been fit()")
 
         if scale_initial_value:
-            if not isinstance(scale_initial_value, torch.Tensor):
-                scale_initial_value = torch.tensor(
-                    scale_initial_value, dtype=torch.float, device=self.device
-                )
+            scale_initial_value = to_tensor(scale_initial_value, device=self.device)
             scale_t = scale_initial_value
         else:
             scale_t = self.d @ self.sample_scale  # type: ignore

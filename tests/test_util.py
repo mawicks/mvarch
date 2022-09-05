@@ -1,5 +1,7 @@
 import pytest
 
+import torch
+
 # Local modules
 import mvarch.util as util
 
@@ -50,3 +52,9 @@ def test_rename_column(test_input, expected_output):
     print(f"test input: {test_input}")
     print(f"expected output: {expected_output}")
     assert util.rename_column(test_input) == expected_output
+
+
+@pytest.mark.parametrize("test_input", [4.0, [[1.0, 2.0], [3.0, 4.0]]])
+def test_to_tensor(test_input):
+    result = util.to_tensor(test_input)
+    assert isinstance(result, torch.Tensor)

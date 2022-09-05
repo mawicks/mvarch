@@ -25,6 +25,7 @@ from .univariate_models import (
 )
 from .matrix_ops import make_diagonal_nonnegative
 from .optimize import optimize
+from .util import to_tensor
 
 
 def joint_conditional_log_likelihood(
@@ -166,26 +167,12 @@ class MultivariateARCHModel:
     def set_parameters(
         self, dim: int, a: Any, b: Any, c: Any, d: Any, sample_scale: Any
     ) -> None:
-        if not isinstance(a, torch.Tensor):
-            a = torch.tensor(
-                a, dtype=torch.float, device=self.device, requires_grad=True
-            )
-        if not isinstance(b, torch.Tensor):
-            b = torch.tensor(
-                b, dtype=torch.float, device=self.device, requires_grad=True
-            )
-        if not isinstance(c, torch.Tensor):
-            c = torch.tensor(
-                c, dtype=torch.float, device=self.device, requires_grad=True
-            )
-        if not isinstance(d, torch.Tensor):
-            d = torch.tensor(
-                d, dtype=torch.float, device=self.device, requires_grad=True
-            )
-        if not isinstance(sample_scale, torch.Tensor):
-            sample_scale = torch.tensor(
-                sample_scale, dtype=torch.float, device=self.device
-            )
+        a = to_tensor(a, device=self.device)
+        b = to_tensor(b, device=self.device)
+        c = to_tensor(c, device=self.device)
+        d = to_tensor(d, device=self.device)
+        sample_scale = to_tensor(sample_scale, device=self.device)
+
         if a.shape != b.shape or a.shape != c.shape or a.shape != d.shape:
             raise ValueError(
                 f"There dimensions of a({a.shape}), b({b.shape}), "
@@ -288,10 +275,8 @@ class MultivariateARCHModel:
             h_next: torch.Tensor prediction for next unobserved value
         """
         if scale_initial_value:
-            if not isinstance(scale_initial_value, torch.Tensor):
-                scale_initial_value = torch.tensor(
-                    scale_initial_value, dtype=torch.float, device=self.device
-                )
+            scale_initial_value = to_tensor(scale_initial_value, device=self.device)
+
             if (
                 len(scale_initial_value.shape) != 2
                 or scale_initial_value.shape[0] != scale_initial_value.shape[1]
@@ -397,6 +382,7 @@ class MultivariateARCHModel:
             float - mean (per sample) log likelihood
 
         """
+        observations = to_tensor(observations, device=self.device)
         uv_scale, uv_mean = self.univariate_model.predict(observations)[:2]
         centered_observations = observations - uv_mean
         result = self.__mean_log_likelihood(centered_observations, uv_scale)
@@ -411,6 +397,8 @@ class MultivariateARCHModel:
         centered_observations: Optional[torch.Tensor]
         uv_scale: Optional[torch.Tensor]
         uv_mean: Optional[torch.Tensor]
+
+        observations = to_tensor(observations, device=self.device)
 
         # If the underlying univariate model has optimizeable
         # parameters, optimize it.  The fit() call also tunes the mean
@@ -524,6 +512,8 @@ class MultivariateARCHModel:
         This is the inference version of predict(), which is the version clients would normally use.
         It doesn't compute any gradient information, so it should be faster.
         """
+        observations = to_tensor(observations, device=self.device)
+
         (
             uv_scale,
             uv_mean,
@@ -602,7 +592,7 @@ if __name__ == "__main__":  # pragma: no cover
             [0.008, 0.009, 0.005],
         ],
     )
-    multivariate_model.univariate_model.set_parameters(n=3)
+    multivariate_model.univariate_model.set_parameters(dim=3)
 
     mv_x, mv_scale, uv_scale, mu = multivariate_model.sample(
         10000, [[0.008, 0.0, 0.0], [0.008, 0.01, 0.0], [0.008, 0.009, 0.005]]

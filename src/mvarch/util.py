@@ -1,4 +1,6 @@
-from typing import List, Iterable, Union
+from typing import Any, List, Iterable, Optional, Union
+
+import torch
 
 
 def to_symbol_list(symbols: Union[Iterable[str], str]) -> List[str]:
@@ -18,6 +20,12 @@ def to_symbol_list(symbols: Union[Iterable[str], str]) -> List[str]:
         symbols = (symbols,)
 
     return list(map(str.upper, symbols))
+
+
+def to_tensor(tensor_like: Any, device: Optional[torch.device] = None):
+    if not isinstance(tensor_like, torch.Tensor):
+        tensor_like = torch.tensor(tensor_like, dtype=torch.float, device=device)
+    return tensor_like
 
 
 def is_sorted(l: Iterable) -> bool:
