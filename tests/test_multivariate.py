@@ -126,7 +126,7 @@ def test_mvarch_model(multivariate_arch_model):
     # Case 1: _predict with sample=False and specified initial value
     scale = multivariate_arch_model._predict(
         observations, scale_initial_value=mvarch_scale_initial_value
-    )[0]
+    )[1]
 
     print("_predict() with sample=False")
 
@@ -139,7 +139,7 @@ def test_mvarch_model(multivariate_arch_model):
     # Case 2: _predict with sample=True and specified initial value
     sample_scale = multivariate_arch_model._predict(
         observations, sample=True, scale_initial_value=mvarch_scale_initial_value
-    )[0]
+    )[1]
 
     print("_predict() with sample=True")
 
@@ -153,7 +153,7 @@ def test_mvarch_model(multivariate_arch_model):
     )
 
     # Case 3: _predict with sample=False and using default initial value.
-    scale = multivariate_arch_model._predict(observations)[0]
+    scale = multivariate_arch_model._predict(observations)[1]
 
     assert utils.tensors_about_equal(scale[0, :], default_initial_value)
 
@@ -325,7 +325,7 @@ def test_arch_fit():
         print("MV scale model parameters: ", model.get_parameters())
 
         mv_scale_next, uv_scale_next, uv_mean_next = model.predict(random_observations)[
-            3:
+            :3
         ]
 
         print("UV mean prediction: ", uv_mean_next)

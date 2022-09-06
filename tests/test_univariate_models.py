@@ -29,15 +29,15 @@ def check_constant_prediction(
         observations.shape
     )
 
-    scale, _, next_scale, __ = model.predict(observations)
+    next_scale, _, scale, __ = model.predict(observations)
     assert torch.all(scale == expanded_constant_scale_value)
     assert torch.all(next_scale == constant_scale_value)
 
-    scale, next_scale = model._predict(observations, sample=False)
+    next_scale, scale = model._predict(observations, sample=False)
     assert torch.all(scale == expanded_constant_scale_value)
     assert torch.all(next_scale == constant_scale_value)
 
-    scale, next_scale = model._predict(observations, sample=True)
+    next_scale, scale = model._predict(observations, sample=True)
     assert torch.all(scale == expanded_constant_scale_value)
     assert torch.all(next_scale == constant_scale_value)
 
@@ -162,7 +162,7 @@ def test_arch_model(univariate_arch_model):
     )
 
     # Case 1: _predict with sample=False and specified initial value
-    scale, scale_next = univariate_arch_model._predict(
+    scale_next, scale = univariate_arch_model._predict(
         observations, scale_initial_value=arch_scale_initial_value
     )
     assert utils.tensors_about_equal(
@@ -178,7 +178,7 @@ def test_arch_model(univariate_arch_model):
     print("scale_next**2: ", scale_next**2)
 
     # Case 2: _predict with sample=True and specified initial value
-    sample_scale, sample_scale_next = univariate_arch_model._predict(
+    sample_scale_next, sample_scale = univariate_arch_model._predict(
         observations, sample=True, scale_initial_value=arch_scale_initial_value
     )
     assert utils.tensors_about_equal(
@@ -194,7 +194,7 @@ def test_arch_model(univariate_arch_model):
     print("sample_scale_next**2: ", sample_scale_next**2)
 
     # Case 3: _predict with sample=False and using default initial value.
-    scale, scale_next = univariate_arch_model._predict(observations)
+    scale_next, scale = univariate_arch_model._predict(observations)
     assert utils.tensors_about_equal(
         scale[0, :], torch.tensor(ARCH_DEFAULT_INITIAL_VALUE)
     )
@@ -273,7 +273,7 @@ def test_arch_fit():
     print("mean model parameters: ", model.mean_model.get_parameters())
     print("scale model parameters: ", model.get_parameters())
 
-    scale_next, mean_next = model.predict(random_observations)[2:]
+    scale_next, mean_next = model.predict(random_observations)[:2]
 
     print("mean prediction: ", mean_next)
     print("scale prediction: ", scale_next)

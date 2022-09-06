@@ -271,8 +271,8 @@ class MultivariateARCHModel:
                            rather than actual observations.
             initial_h: torch.Tensor - Initial covariance lower-triangular sqrt.
         Returns:
-            h: torch.Tensor of predictions for each observation
-            h_next: torch.Tensor prediction for next unobserved value
+            scale_next: torch.Tensor prediction for next unobserved value
+            scale: torch.Tensor of predictions for each observation
         """
         if scale_initial_value is not None:
             if (
@@ -331,7 +331,7 @@ class MultivariateARCHModel:
             scale_t = self.transform_matrix(m)
 
         scale = torch.stack(scale_sequence)
-        return scale, scale_t
+        return scale_t, scale
 
     def __mean_log_likelihood(
         self,
@@ -354,7 +354,7 @@ class MultivariateARCHModel:
 
         scaled_centered_observations = centered_observations / uv_scale
 
-        mv_scale = self._predict(scaled_centered_observations)[0]
+        mv_scale = self._predict(scaled_centered_observations)[1]
 
         # It's important to use non-scaled observations in likelihood function
         mean_ll = joint_conditional_log_likelihood(
@@ -381,7 +381,7 @@ class MultivariateARCHModel:
 
         """
         observations = to_tensor(observations, device=self.device)
-        uv_scale, uv_mean = self.univariate_model.predict(observations)[:2]
+        uv_scale, uv_mean = self.univariate_model.predict(observations)[2:]
         centered_observations = observations - uv_mean
         result = self.__mean_log_likelihood(centered_observations, uv_scale)
 
@@ -405,7 +405,7 @@ class MultivariateARCHModel:
 
         if self.univariate_model.is_optimizable:
             self.univariate_model.fit(observations)
-            uv_scale, uv_mean = self.univariate_model.predict(observations)[:2]
+            uv_scale, uv_mean = self.univariate_model.predict(observations)[2:]
             centered_observations = observations - uv_mean
             self.initialize_parameters(centered_observations / uv_scale)
         else:
@@ -463,11 +463,11 @@ class MultivariateARCHModel:
             else:
                 closure_uv_mean = self.univariate_model.mean_model._predict(
                     observations
-                )[0]
+                )[1]
                 closure_centered_observations = observations - closure_uv_mean
                 closure_uv_scale = self.univariate_model._predict(
                     closure_centered_observations
-                )[0]
+                )[1]
                 closure_centered_observations = (
                     closure_centered_observations / closure_uv_scale
                 )
@@ -513,17 +513,24 @@ class MultivariateARCHModel:
         observations = to_tensor(observations, device=self.device)
 
         (
-            uv_scale,
-            uv_mean,
             uv_scale_next,
             uv_mean_next,
+            uv_scale,
+            uv_mean,
         ) = self.univariate_model.predict(observations)
         centered_observations = observations - uv_mean
         scaled_centered_observations = centered_observations / uv_scale
 
-        mv_scale, mv_scale_next = self._predict(scaled_centered_observations)
+        mv_scale_next, mv_scale = self._predict(scaled_centered_observations)
 
-        return mv_scale, uv_scale, uv_mean, mv_scale_next, uv_scale_next, uv_mean_next
+        return (
+            mv_scale_next,
+            uv_scale_next,
+            uv_mean_next,
+            mv_scale,
+            uv_scale,
+            uv_mean,
+        )
 
     @torch.no_grad()
     def sample(
@@ -560,7 +567,7 @@ class MultivariateARCHModel:
 
         mv_scale = self._predict(
             n, sample=True, scale_initial_value=mv_scale_initial_value
-        )[0]
+        )[1]
         mv_scaled_noise = (mv_scale @ n.unsqueeze(2)).squeeze(2)
 
         output, uv_scale, uv_mean = self.univariate_model.sample(

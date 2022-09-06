@@ -108,8 +108,8 @@ class UnivariateScalingModel(Protocol):
             initial_scale: torch.Tensor - Initial condition for scale
             initial_mean: torch.Tensor - Initial condition for mean
         Returns:
-            scale: torch.Tensor of scale predictions for each observation
             scale_next: torch.Tensor scale prediction for next unobserved value
+            scale: torch.Tensor of scale predictions for each observation
 
         """
 
@@ -166,19 +166,19 @@ class UnivariateScalingModel(Protocol):
         It doesn't compute any gradient information, so it should be faster.
         """
         observations = to_tensor(observations, device=self.device)
-        mu, mu_next = self.mean_model.predict(observations, mean_initial_value)
-        scale, scale_next = self._predict(observations - mu, scale_initial_value)
+        mu_next, mu = self.mean_model.predict(observations, mean_initial_value)
+        scale_next, scale = self._predict(observations - mu, scale_initial_value)
 
-        return scale, mu, scale_next, mu_next
+        return scale_next, mu_next, scale, mu
 
     def __mean_log_likelihood(self, observations: torch.Tensor) -> torch.Tensor:
         """Compute and return the mean (per-sample) log likelihood (the total
         log likelihood divided by the number of samples).
 
         """
-        mu = self.mean_model._predict(observations)[0]
+        mu = self.mean_model._predict(observations)[1]
         centered_observations = observations - mu
-        scale = self._predict(centered_observations)[0]
+        scale = self._predict(centered_observations)[1]
         mean_ll = marginal_conditional_log_likelihood(
             centered_observations, scale, self.distribution.get_instance()
         )
@@ -222,12 +222,12 @@ class UnivariateScalingModel(Protocol):
             n = self.distribution.get_instance().sample((n, dim))
 
         scale = self._predict(n, sample=True, scale_initial_value=scale_initial_value)[
-            0
+            1
         ]
         scaled_noise = scale * n
         mu = self.mean_model._predict(
             scaled_noise, sample=True, mean_initial_value=mean_initial_value
-        )[0]
+        )[1]
         output = scaled_noise + mu
         return output, scale, mu
 
@@ -296,8 +296,8 @@ class UnivariateUnitScalingModel(UnivariateScalingModel):
             mean_initial_value: torch.Tensor - Initial condition for mean (ignored)
 
         Returns:
-            scale: torch.Tensor of scale predictions for each observation
             scale_next: torch.Tensor scale prediction for next unobserved value
+            scale: torch.Tensor of scale predictions for each observation
 
         """
         # Set all of the scaling to ones.
@@ -307,7 +307,7 @@ class UnivariateUnitScalingModel(UnivariateScalingModel):
         next_scale = torch.ones(
             centered_observations.shape[1], dtype=torch.float, device=self.device
         )
-        return scale, next_scale
+        return next_scale, scale
 
 
 class UnivariateARCHModel(UnivariateScalingModel):
@@ -481,7 +481,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
             scale_t = torch.linalg.vector_norm(m, dim=0)
 
         scale = torch.stack(scale_sequence)
-        return scale, scale_t
+        return scale_t, scale
 
 
 if __name__ == "__main__":  # pragma: no cover

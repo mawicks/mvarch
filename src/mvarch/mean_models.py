@@ -60,8 +60,8 @@ class MeanModel(Protocol):
             mean_initial_value: torch.Tensor (or something convertible to one)
                           Initial mean vector if specified
         Returns:
-            mu: torch.Tensor of predictions for each observation
             mu_next: torch.Tensor prediction for next unobserved value
+            mu: torch.Tensor of predictions for each observation
 
         """
 
@@ -142,7 +142,7 @@ class ZeroMeanModel(MeanModel):
         mu_next = torch.zeros(
             observations.shape[1], dtype=torch.float, device=self.device
         )
-        return mu, mu_next
+        return mu_next, mu
 
 
 class ConstantMeanModel(MeanModel):
