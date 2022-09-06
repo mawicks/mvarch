@@ -518,6 +518,7 @@ class MultivariateARCHModel:
             uv_scale,
             uv_mean,
         ) = self.univariate_model.predict(observations)
+
         centered_observations = observations - uv_mean
         scaled_centered_observations = centered_observations / uv_scale
 

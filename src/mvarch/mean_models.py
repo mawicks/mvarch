@@ -214,7 +214,7 @@ class ConstantMeanModel(MeanModel):
         print(self.mu)
         mu = self.mu.unsqueeze(0).expand(observations.shape)
         mu_next = self.mu
-        return mu, mu_next
+        return mu_next, mu
 
 
 class ARMAMeanModel(MeanModel):
@@ -384,7 +384,7 @@ class ARMAMeanModel(MeanModel):
             mu_t = a_mu + b_o + c_sample_mean
 
         mu = torch.stack(mu_sequence)
-        return mu, mu_t
+        return mu_t, mu
 
 
 if __name__ == "__main__":  # pragma: no cover

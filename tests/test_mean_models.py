@@ -12,17 +12,23 @@ def check_constant_prediction(model, observations, constant_mean_value):
         observations.shape
     )
 
-    means, next_mean = model.predict(observations)
-    assert torch.all(means == expanded_constant_mean_value)
+    next_mean, means = model.predict(observations)
+    assert next_mean.shape == constant_mean_value.shape
+    assert means.shape == expanded_constant_mean_value.shape
     assert torch.all(next_mean == constant_mean_value)
+    assert torch.all(means == expanded_constant_mean_value)
 
-    means, next_mean = model._predict(observations, sample=False)
-    assert torch.all(means == expanded_constant_mean_value)
+    next_mean, means = model._predict(observations, sample=False)
+    assert next_mean.shape == constant_mean_value.shape
+    assert means.shape == expanded_constant_mean_value.shape
     assert torch.all(next_mean == constant_mean_value)
+    assert torch.all(means == expanded_constant_mean_value)
 
-    means, next_mean = model._predict(observations, sample=True)
-    assert torch.all(means == expanded_constant_mean_value)
+    next_mean, means = model._predict(observations, sample=True)
+    assert next_mean.shape == constant_mean_value.shape
+    assert means.shape == expanded_constant_mean_value.shape
     assert torch.all(next_mean == constant_mean_value)
+    assert torch.all(means == expanded_constant_mean_value)
 
 
 def test_zero_mean_model():
@@ -143,22 +149,22 @@ def test_ARMA_mean_model():
 
     # CASE 1: Specified parameters, specified input, and specified initial value.
 
-    means, next_mean = mean_model._predict(
+    next_mean, means = mean_model._predict(
         observations, sample=False, mean_initial_value=arma_mean_initial_value
     )
-    assert utils.tensors_about_equal(means, predicted_means)
     assert utils.tensors_about_equal(next_mean, next_predicted_mean)
+    assert utils.tensors_about_equal(means, predicted_means)
 
     # CASE 2: Same but use default initial value.  We only check that
     # the initial value was used.
 
-    means, next_mean = mean_model._predict(observations, sample=False)
+    next_mean, means = mean_model._predict(observations, sample=False)
     assert torch.all(means[0, :] == default_initial_value)
 
     # CASE 3: Specified parameters, specified input, specified initial
     # value, and sample == True
 
-    means, next_mean = mean_model._predict(
+    next_mean, means = mean_model._predict(
         observations, sample=True, mean_initial_value=arma_mean_initial_value
     )
     assert utils.tensors_about_equal(means, sample_predicted_means)
