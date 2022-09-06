@@ -7,14 +7,15 @@ import numpy as np
 import torch
 
 # Local modules
+# From package under test
+from mvarch.mean_models import ARMAMeanModel
 from mvarch.univariate_models import (
     marginal_conditional_log_likelihood,
     UnivariateUnitScalingModel,
     UnivariateARCHModel,
 )
 
-from mvarch.mean_models import ARMAMeanModel
-
+# Local testing tools
 from . import utils
 
 
@@ -28,15 +29,15 @@ def check_constant_prediction(
         observations.shape
     )
 
-    scale, _, next_scale, __ = model.predict(observations)
+    next_scale, _, scale, __ = model.predict(observations)
     assert torch.all(scale == expanded_constant_scale_value)
     assert torch.all(next_scale == constant_scale_value)
 
-    scale, next_scale = model._predict(observations, sample=False)
+    next_scale, scale = model._predict(observations, sample=False)
     assert torch.all(scale == expanded_constant_scale_value)
     assert torch.all(next_scale == constant_scale_value)
 
-    scale, next_scale = model._predict(observations, sample=True)
+    next_scale, scale = model._predict(observations, sample=True)
     assert torch.all(scale == expanded_constant_scale_value)
     assert torch.all(next_scale == constant_scale_value)
 
@@ -47,29 +48,40 @@ def check_constant_prediction(
     )
 
 
-def test_scaling_model():
+@pytest.fixture
+def univariate_unit_scaling_model():
+    return UnivariateUnitScalingModel()
+
+
+def test_unitialized_unit_scaling_model_sample_raises(univariate_unit_scaling_model):
+    with pytest.raises(ValueError):
+        univariate_unit_scaling_model.sample(10)
+
+
+def test_unit_scaling_model_fit_raises(univariate_unit_scaling_model):
+    N = 3
+    observations = torch.randn((10, N), dtype=torch.float)
+    with pytest.raises(ValueError):
+        univariate_unit_scaling_model.fit(observations)
+
+
+def test_unit_scaling_model_operates_sanely(univariate_unit_scaling_model):
     N = 3
     observations = torch.randn((10, N), dtype=torch.float)
     noise = torch.randn(observations.shape, dtype=torch.float)
-    model = UnivariateUnitScalingModel()
 
-    with pytest.raises(ValueError):
-        model.sample(10)
+    assert univariate_unit_scaling_model.is_optimizable == False
 
-    utils.set_and_check_parameters(model, observations, {"n": N}, 0, 0)
+    utils.set_and_check_parameters(
+        univariate_unit_scaling_model, observations, {"dim": N}, 1, 0
+    )
 
     check_constant_prediction(
-        model,
+        univariate_unit_scaling_model,
         observations,
         torch.ones(observations.shape[1], dtype=torch.float),
         torch.zeros(observations.shape[1], dtype=torch.float),
     )
-
-
-def test_constant_scale_with_armma_mean_fails():
-    mean_model = ARMAMeanModel()
-    with pytest.raises(ValueError):
-        model = UnivariateUnitScalingModel(mean_model=mean_model)
 
 
 # These aren't realistic values.  They're just some nice whole numbers for testing.
@@ -120,24 +132,38 @@ ARCH_INVALID_PARAMETERS = {
 }
 
 
-def test_arch_model():
+@pytest.fixture
+def univariate_arch_model():
+    return UnivariateARCHModel()
+
+
+def test_uninitialized_arch_model_get_optimizable_raises(univariate_arch_model):
+    with pytest.raises(RuntimeError):
+        univariate_arch_model.get_optimizable_parameters()
+
+
+def test_uninitialized_arch_model_sample_raises(univariate_arch_model):
+    observations = torch.tensor(ARCH_CENTERED_OBSERVATIONS, dtype=torch.float)
+    with pytest.raises(RuntimeError):
+        univariate_arch_model.sample(observations)
+
+
+def test_arch_model(univariate_arch_model):
     default_initial_value = torch.tensor(ARCH_DEFAULT_INITIAL_VALUE, dtype=torch.float)
+    arch_scale_initial_value = torch.tensor(ARCH_SCALE_INITIAL_VALUE, dtype=torch.float)
     observations = torch.tensor(ARCH_CENTERED_OBSERVATIONS, dtype=torch.float)
     # For now, also use observations as the nois einput when sample=True.
     noise = observations
 
-    model = UnivariateARCHModel()
-    with pytest.raises(ValueError):
-        model.get_optimizable_parameters()
+    assert univariate_arch_model.is_optimizable == True
 
-    with pytest.raises(RuntimeError):
-        model.sample(observations)
-
-    utils.set_and_check_parameters(model, observations, ARCH_VALID_PARAMETERS, 5, 4)
+    utils.set_and_check_parameters(
+        univariate_arch_model, observations, ARCH_VALID_PARAMETERS, 5, 4
+    )
 
     # Case 1: _predict with sample=False and specified initial value
-    scale, scale_next = model._predict(
-        observations, scale_initial_value=ARCH_SCALE_INITIAL_VALUE
+    scale_next, scale = univariate_arch_model._predict(
+        observations, scale_initial_value=arch_scale_initial_value
     )
     assert utils.tensors_about_equal(
         scale, torch.tensor(PREDICTED_SCALE, dtype=torch.float)
@@ -152,8 +178,8 @@ def test_arch_model():
     print("scale_next**2: ", scale_next**2)
 
     # Case 2: _predict with sample=True and specified initial value
-    sample_scale, sample_scale_next = model._predict(
-        observations, sample=True, scale_initial_value=ARCH_SCALE_INITIAL_VALUE
+    sample_scale_next, sample_scale = univariate_arch_model._predict(
+        observations, sample=True, scale_initial_value=arch_scale_initial_value
     )
     assert utils.tensors_about_equal(
         sample_scale, torch.tensor(SAMPLE_PREDICTED_SCALE, dtype=torch.float)
@@ -168,13 +194,13 @@ def test_arch_model():
     print("sample_scale_next**2: ", sample_scale_next**2)
 
     # Case 3: _predict with sample=False and using default initial value.
-    scale, scale_next = model._predict(observations)
+    scale_next, scale = univariate_arch_model._predict(observations)
     assert utils.tensors_about_equal(
         scale[0, :], torch.tensor(ARCH_DEFAULT_INITIAL_VALUE)
     )
 
     with pytest.raises(ValueError):
-        model.set_parameters(**ARCH_INVALID_PARAMETERS)
+        univariate_arch_model.set_parameters(**ARCH_INVALID_PARAMETERS)
 
 
 def test_marginal_likelihood():
@@ -224,33 +250,47 @@ def test_arch_fit():
     constant variance and see if the model predicts that constant
     variance.
     """
-    CONSTANT_SCALE = 0.25
-    SAMPLE_SIZE = 500
-    TOLERANCE = 0.10
+    CONSTANT_SCALE = torch.tensor(0.25)
+    CONSTANT_MEAN = torch.tensor(0.5)
+    SAMPLE_SIZE = 2500
+    TOLERANCE = 0.075
 
     # The tolerance hasn't been chosen very scientifically.  The sample size
-    # is fairly small for a quick test so it won't be tight.
+    # Is fairly small for a quick test so it won't be tight.
 
     random_observations = torch.randn((SAMPLE_SIZE, 1))
 
     # The sample variance is random.  Scale the sample so that the
-    # sample standard deviation is *exactly* what we expect the model
-    # to predict.
+    # sample standard deviation and the sample mean are *exactly* what
+    # we expect the model to predict.
     random_observations = (
-        random_observations / torch.std(random_observations) * CONSTANT_SCALE
-    )
+        random_observations - torch.mean(random_observations)
+    ) / torch.std(random_observations) * CONSTANT_SCALE + CONSTANT_MEAN
 
-    model = UnivariateARCHModel()
+    model = UnivariateARCHModel(mean_model=ARMAMeanModel())
     model.fit(random_observations)
 
-    scale_next = model.predict(random_observations)[2]
+    print("mean model parameters: ", model.mean_model.get_parameters())
+    print("scale model parameters: ", model.get_parameters())
 
-    assert abs(scale_next - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
+    scale_next, mean_next = model.predict(random_observations)[:2]
+
+    print("mean prediction: ", mean_next)
+    print("scale prediction: ", scale_next)
+
+    assert utils.tensors_about_equal(scale_next, CONSTANT_SCALE, TOLERANCE)
+    assert utils.tensors_about_equal(mean_next, CONSTANT_MEAN, TOLERANCE)
 
     # Make sure that sample(int) returns something reasonable
-    sample_std = float(torch.std(model.sample(SAMPLE_SIZE)[0]))
-    print("std sample: ", sample_std)
-    assert abs(sample_std - CONSTANT_SCALE) < TOLERANCE * CONSTANT_SCALE
+    sample_output = model.sample(SAMPLE_SIZE)[0]
+    sample_mean = float(torch.mean(sample_output))
+    sample_std = float(torch.std(sample_output))
+
+    print("sample mean: ", sample_mean)
+    print("sample std: ", sample_std)
+
+    assert utils.tensors_about_equal(sample_std, CONSTANT_SCALE, TOLERANCE)
+    assert utils.tensors_about_equal(sample_mean, CONSTANT_MEAN, TOLERANCE)
 
     # Check that the log likelihoods being returned are reasonable
     actual = model.mean_log_likelihood(random_observations)

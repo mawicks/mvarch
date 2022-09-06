@@ -1,13 +1,17 @@
 import torch
 
-EPS = 1e-6
+EPS = 5e-6
 
 
 def tensors_about_equal(t1, t2, eps=EPS):
-    result = torch.norm(t1 - t2) < EPS * torch.norm(t1 + t2)
+    diff_norm = torch.norm(t1 - t2)
+    sum_norm = torch.norm(t1 + t2)
+    result = diff_norm <= eps * sum_norm
     if not result:
         print("first tensor:\n", t1)
         print("second tensor:\n", t2)
+        print("norm of diff:\n", diff_norm)
+        print("norm of sum:\n", sum_norm)
     return result
 
 
@@ -21,9 +25,12 @@ def set_and_check_parameters(model, observations, parameters, number, opt_number
     # Make sure we can get the full set of parameters and that they are optimizable
     # and loggable.
 
-    def test_parameters():
+    def test_initialized_parameters():
         parameters = model.get_parameters()
         assert len(parameters) == number
+
+        print(f"model.dimension: {model.dimension}")
+        assert model.dimension is not None
 
         optimizable_parameters = model.get_optimizable_parameters()
         assert len(optimizable_parameters) == opt_number
@@ -37,11 +44,12 @@ def set_and_check_parameters(model, observations, parameters, number, opt_number
     # Attempt to log before parameter values are set (this should work
     # without raising an exception)
     model.log_parameters()
+    assert model.dimension is None
 
     # Attempt to initialize the parameters to default values, then test them.
     model.initialize_parameters(observations)
-    test_parameters()
+    test_initialized_parameters()
 
     # Attempt to initialize the parameters to user-specified value, then test them.
     model.set_parameters(**parameters)
-    test_parameters()
+    test_initialized_parameters()

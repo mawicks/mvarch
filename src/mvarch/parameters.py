@@ -23,7 +23,9 @@ class Parameter(Protocol):
     device: Optional[torch.device]
 
     @abstractmethod
-    def __init__(self, n: int, scale: float, device: Optional[torch.device]):
+    def __init__(
+        self, n: int, scale: float = 1.0, device: Optional[torch.device] = None
+    ):
         """Abstract method with no implementation."""
 
     @abstractmethod

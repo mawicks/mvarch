@@ -12,6 +12,7 @@ from .parameters import (
     Parameter,
     DiagonalParameter,
 )
+from .util import to_tensor
 
 
 class MeanModel(Protocol):
@@ -21,6 +22,11 @@ class MeanModel(Protocol):
 
     @abstractmethod
     def set_parameters(self, **kwargs: Any) -> None:
+        """Abstract method with no implementation."""
+
+    @property
+    @abstractmethod
+    def dimension(self) -> Optional[int]:
         """Abstract method with no implementation."""
 
     @abstractmethod
@@ -40,7 +46,7 @@ class MeanModel(Protocol):
         self,
         observations: torch.Tensor,
         sample: bool = False,
-        mean_initial_value: Union[torch.Tensor, Any, None] = None,
+        mean_initial_value: Union[torch.Tensor, None] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given a, b, c, d, and observations, generate the *estimated*
         standard deviations (marginal) for each observation
@@ -54,8 +60,8 @@ class MeanModel(Protocol):
             mean_initial_value: torch.Tensor (or something convertible to one)
                           Initial mean vector if specified
         Returns:
-            mu: torch.Tensor of predictions for each observation
             mu_next: torch.Tensor prediction for next unobserved value
+            mu: torch.Tensor of predictions for each observation
 
         """
 
@@ -81,20 +87,28 @@ class MeanModel(Protocol):
 
 
 class ZeroMeanModel(MeanModel):
+    __dim: Optional[int]
+
     def __init__(
         self,
         device: Optional[torch.device] = None,
     ):
         self.device = device
+        self.__dim = None
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        pass
+        self.__dim = observations.shape[1]
 
     def set_parameters(self, **kwargs: Any) -> None:
-        pass
+        dim = kwargs["dim"]
+        self.__dim = dim
+
+    @property
+    def dimension(self) -> Optional[int]:
+        return self.__dim
 
     def get_parameters(self) -> Dict[str, Any]:
-        return {}
+        return {"dim": self.__dim}
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         return []
@@ -106,7 +120,7 @@ class ZeroMeanModel(MeanModel):
         self,
         observations: torch.Tensor,
         sample: bool = False,
-        mean_initial_value: Union[torch.Tensor, Any, None] = None,
+        mean_initial_value: Union[torch.Tensor, None] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given a, b, c, d, and observations, generate the *estimated*
         standard deviations (marginal) for each observation
@@ -128,7 +142,7 @@ class ZeroMeanModel(MeanModel):
         mu_next = torch.zeros(
             observations.shape[1], dtype=torch.float, device=self.device
         )
-        return mu, mu_next
+        return mu_next, mu
 
 
 class ConstantMeanModel(MeanModel):
@@ -149,14 +163,18 @@ class ConstantMeanModel(MeanModel):
 
     def set_parameters(self, **kwargs: Any) -> None:
         mu = kwargs["mu"]
-        if not isinstance(mu, torch.Tensor):
-            mu = torch.tensor(
-                mu, dtype=torch.float, device=self.device, requires_grad=True
-            )
+        mu = to_tensor(mu, device=self.device, requires_grad=True)
+        if len(mu.shape) != 1:
+            raise ValueError(f"Parameter `mu` must be a vector: {mu}")
+
         self.mu = mu
 
+    @property
+    def dimension(self) -> Optional[int]:
+        return self.mu.shape[0] if self.mu is not None else None
+
     def get_parameters(self) -> Dict[str, Any]:
-        return {"mu": self.mu}
+        return {"mu": self.mu.detach().numpy() if self.mu is not None else None}
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
         if self.mu is None:
@@ -172,7 +190,7 @@ class ConstantMeanModel(MeanModel):
         self,
         observations: torch.Tensor,
         sample: bool = False,
-        mean_initial_value: Union[torch.Tensor, Any, None] = None,
+        mean_initial_value: Union[torch.Tensor, None] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given a, b, c, d, and observations, generate the *estimated*
         standard deviations (marginal) for each observation
@@ -196,7 +214,7 @@ class ConstantMeanModel(MeanModel):
         print(self.mu)
         mu = self.mu.unsqueeze(0).expand(observations.shape)
         mu_next = self.mu
-        return mu, mu_next
+        return mu_next, mu
 
 
 class ARMAMeanModel(MeanModel):
@@ -205,23 +223,29 @@ class ARMAMeanModel(MeanModel):
     c: Optional[Parameter]
     d: Optional[Parameter]
     sample_mean: Optional[torch.Tensor]
+
+    __dim: Optional[int]
+
     device: Optional[torch.device]
 
     def __init__(
         self,
         device: Optional[torch.device] = None,
     ):
-        self.a = self.b = self.c = self.d = None
+        self.__dim = self.a = self.b = self.c = self.d = None
         self.sample_mean = None
         self.device = device
 
     def initialize_parameters(self, observations: torch.Tensor) -> None:
-        n = observations.shape[1]
-        self.a = DiagonalParameter(n, 1.0 - constants.INITIAL_DECAY, device=self.device)
-        self.b = DiagonalParameter(n, constants.INITIAL_DECAY, device=self.device)
-        self.c = DiagonalParameter(n, 1.0, device=self.device)
-        self.d = DiagonalParameter(n, 1.0, device=self.device)
+        dim = observations.shape[1]
+        self.a = DiagonalParameter(
+            dim, 1.0 - constants.INITIAL_DECAY, device=self.device
+        )
+        self.b = DiagonalParameter(dim, constants.INITIAL_DECAY, device=self.device)
+        self.c = DiagonalParameter(dim, 1.0, device=self.device)
+        self.d = DiagonalParameter(dim, 1.0, device=self.device)
         self.sample_mean = torch.mean(observations, dim=0)
+        self.__dim = dim
 
     def set_parameters(self, **kwargs: Any) -> None:
         a = kwargs["a"]
@@ -265,22 +289,30 @@ class ARMAMeanModel(MeanModel):
                 "only and only one dimension that's consistent"
             )
 
-        n = a.shape[0]
-        self.a = DiagonalParameter(n).set(a)
-        self.b = DiagonalParameter(n).set(b)
-        self.c = DiagonalParameter(n).set(c)
-        self.d = DiagonalParameter(n).set(d)
+        dim = a.shape[0]
+        self.a = DiagonalParameter(dim).set(a)
+        self.b = DiagonalParameter(dim).set(b)
+        self.c = DiagonalParameter(dim).set(c)
+        self.d = DiagonalParameter(dim).set(d)
 
         self.sample_mean = sample_mean
 
+        self.__dim = dim
+
+    @property
+    def dimension(self) -> Optional[int]:
+        return self.__dim
+
     def get_parameters(self) -> Dict[str, Any]:
-        safe_value = lambda x: x.value if x is not None else None
+        safe_value = lambda x: x.value.detach().numpy() if x is not None else None
         return {
             "a": safe_value(self.a),
             "b": safe_value(self.b),
             "c": safe_value(self.c),
             "d": safe_value(self.d),
-            "sample_mean": self.sample_mean,
+            "sample_mean": self.sample_mean.detach().numpy()
+            if self.sample_mean is not None
+            else None,
         }
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
@@ -304,8 +336,8 @@ class ARMAMeanModel(MeanModel):
     def _predict(
         self,
         observations: torch.Tensor,
-        sample=False,
-        mean_initial_value: Union[torch.Tensor, Any, None] = None,
+        sample: bool = False,
+        mean_initial_value: Union[torch.Tensor, None] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given a, b, c, d, and observations, generate the *estimated*
         standard deviations (marginal) for each observation
@@ -326,11 +358,7 @@ class ARMAMeanModel(MeanModel):
         if self.a is None or self.b is None or self.c is None or self.d is None:
             raise RuntimeError("Mean model has not been initialized)")
 
-        if mean_initial_value:
-            if not isinstance(mean_initial_value, torch.Tensor):
-                mean_initial_value = torch.tensor(
-                    mean_initial_value, dtype=torch.float, device=self.device
-                )
+        if mean_initial_value is not None:
             mu_t = mean_initial_value
         else:
             mu_t = self.d @ self.sample_mean  # type: ignore
@@ -356,7 +384,7 @@ class ARMAMeanModel(MeanModel):
             mu_t = a_mu + b_o + c_sample_mean
 
         mu = torch.stack(mu_sequence)
-        return mu, mu_t
+        return mu_t, mu
 
 
 if __name__ == "__main__":  # pragma: no cover

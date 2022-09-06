@@ -81,8 +81,6 @@ class StudentTDistribution(Distribution):
         logging.info(f"StudentT DF: {self.df:.3f}")
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
-        print("df: ", self.df)
-
         return [self.df]
 
     def get_instance(self) -> torch.distributions.Distribution:
