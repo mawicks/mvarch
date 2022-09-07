@@ -614,7 +614,7 @@ class MultivariateARCHModel:
         uv_scale_list = []
         mean_list = []
 
-        for i in range(samples if samples is not None else 1):
+        for _ in range(samples if samples is not None else 1):
             output, mv_scale, uv_scale, mean = self.sample(
                 periods,
                 mv_scale_initial_value=initial_mv_state,
