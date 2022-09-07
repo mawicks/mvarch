@@ -306,3 +306,84 @@ def test_arch_fit():
     # Since these are logs, we use an absolute tolerance rather than a relative tolerance
     # Again, this is just a sanity check and not a very stringent test.
     assert abs(actual - expected) < TOLERANCE
+
+
+SANE_UV_PARAMETERS = {
+    "a": [0.9482781, 0.87155545],
+    "b": [0.15232861, 0.10627481],
+    "c": [0.2793683, 0.48152938],
+    "d": [0.01429591, 0.71451986],
+    "sample_scale": [0.2501, 0.1000],
+}
+
+
+SANE_MEAN_PARAMETERS = {
+    "a": [0.16967115, 0.1777586],
+    "b": [0.01160183, 0.02662377],
+    "c": [0.81673557, 0.796202],
+    "d": [0.83479756, 0.59621435],
+    "sample_mean": [0.5, -0.24999999],
+}
+
+
+@pytest.fixture()
+def sane_model():
+    mean_model = ARMAMeanModel()
+    mean_model.set_parameters(**SANE_MEAN_PARAMETERS)
+
+    univariate_model = UnivariateARCHModel(mean_model=mean_model)
+    univariate_model.set_parameters(**SANE_UV_PARAMETERS)
+
+    return univariate_model
+
+
+def generate_observations(
+    sample_size,
+    mean_vector: torch.tensor,
+    uv_scale: torch.tensor,
+) -> torch.tensor:
+    """
+    Generate independent random observations
+    """
+    if mean_vector.shape != uv_scale.shape:
+        raise ValueError("Vectors must conform")
+
+    white_noise = torch.randn((sample_size, mean_vector.shape[0]))
+    # Correct sample mean, sample variance, and orthogonality slightly so that the
+    # sample statistics are what we want.
+    white_noise = white_noise - torch.mean(white_noise, dim=0)
+    white_noise = torch.linalg.qr(white_noise, mode="reduced")[0] * sqrt(sample_size)
+
+    # Resulting sample should have 1) zero mean; 2) unit variance; 3) orthogonal columns
+
+    # Multiply and drop the last dimension.
+    random_observations = uv_scale * white_noise + mean_vector
+
+    return random_observations, white_noise
+
+
+@pytest.fixture()
+def random_observations():
+    SAMPLE_SIZE = 2000  # Was 2500
+    CONSTANT_MEAN = torch.tensor([0.5, -0.25])
+    CONSTANT_UV_SCALE = torch.tensor([0.25, 0.1])
+    random_observations = generate_observations(
+        SAMPLE_SIZE,
+        CONSTANT_MEAN,
+        CONSTANT_UV_SCALE,
+    )[0]
+    return random_observations
+
+
+def test_simulate(sane_model, random_observations):
+    # Check that simulate executes and returns tensors with the proper dimensions
+    output, scale, mean = sane_model.simulate(random_observations, 10, 3)
+    assert output.shape == (3, 10, 2)
+    assert scale.shape == output.shape
+    assert mean.shape == output.shape
+
+    # If simulation count isn't provided, first dimension should be dropped.
+    output, scale, mean = sane_model.simulate(random_observations, 10)
+    assert output.shape == (10, 2)
+    assert scale.shape == output.shape
+    assert mean.shape == output.shape

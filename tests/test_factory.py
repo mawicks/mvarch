@@ -30,7 +30,7 @@ def test_factory():
     assert type(model.distribution) == StudentTDistribution
     assert model.parameter_type == TriangularParameter
 
-    # Case 3
+    # Case 3 - Use None rather than a string
     model = model_factory(
         distribution="studentt",
         mean="arma",
@@ -41,3 +41,14 @@ def test_factory():
     assert type(model.univariate_model.mean_model) == ARMAMeanModel
     assert type(model.distribution) == StudentTDistribution
     assert model.parameter_type == TriangularParameter
+
+    # Case 3 - No multivariate model
+    model = model_factory(
+        distribution="studentt",
+        mean="arma",
+        univariate="arch",
+        multivariate=None,
+    )
+    assert type(model) == UnivariateARCHModel
+    assert type(model.mean_model) == ARMAMeanModel
+    assert type(model.distribution) == StudentTDistribution

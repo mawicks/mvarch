@@ -22,6 +22,11 @@ UNIVARIATE_CHOICES = {
     "none": univariate_models.UnivariateUnitScalingModel,
 }
 
+MULTIVARIATE_CHOICES = {
+    "mvarch": multivariate_models.MultivariateARCHModel,
+    "none": None,
+}
+
 CONSTRAINT_CHOICES = {
     "scalar": parameters.ParameterConstraint.SCALAR,
     "diagonal": parameters.ParameterConstraint.DIAGONAL,
@@ -46,19 +51,26 @@ def model_factory(
     mean: str = "zero",
     univariate: str = "arch",
     constraint: str = "none",
+    multivariate: str = "mvarch",
 ):
     distribution_type = get_choice("distribution", distribution, DISTRIBUTION_CHOICES)
     mean_type = get_choice("mean", mean, MEAN_CHOICES)
     univariate_type = get_choice("univariate", univariate, UNIVARIATE_CHOICES)
+    multivariate_type = get_choice("multivariate", multivariate, MULTIVARIATE_CHOICES)
     constraint_type = get_choice("constraint", constraint, CONSTRAINT_CHOICES)
+
     univariate_model = univariate_type(
         distribution=distribution_type(), mean_model=mean_type()
     )
-    multivariate_model = multivariate_models.MultivariateARCHModel(
-        univariate_model=univariate_model, constraint=constraint_type
-    )
 
-    return multivariate_model
+    if multivariate_type is not None:
+        model = multivariate_type(
+            univariate_model=univariate_model, constraint=constraint_type
+        )
+    else:
+        model = univariate_model
+
+    return model
 
 
 if __name__ == "__main__":  # pragma: no cover
