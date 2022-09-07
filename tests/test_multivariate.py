@@ -310,19 +310,23 @@ def test_arch_fit():
     # have different code paths.
     for univariate_model_type in (UnivariateARCHModel, UnivariateUnitScalingModel):
         print(f"univariate_model_type: {univariate_model_type}")
-        random_observations, white_noise_used = generate_observations(
+        random_observations = generate_observations(
             SAMPLE_SIZE,
             CONSTANT_MEAN,
             CONSTANT_UV_SCALE,
             CONSTANT_MV_SCALE,
-        )
+        )[0]
 
         observation_stats(random_observations)
         model = make_model(univariate_model_type)
         model.fit(random_observations)
 
-        # print("mean model parameters: ", model.mean_model.get_parameters())
-        print("MV scale model parameters: ", model.get_parameters())
+        print("MV model parameters: ", model.get_parameters())
+        print("UV model parameters: ", model.univariate_model.get_parameters())
+        print(
+            "mean model parameters: ",
+            model.univariate_model.mean_model.get_parameters(),
+        )
 
         mv_scale_next, uv_scale_next, uv_mean_next = model.predict(random_observations)[
             :3
@@ -359,7 +363,6 @@ def test_arch_fit():
         # Check that the log likelihoods being returned are reasonable
         model_log_likelihood = model.mean_log_likelihood(random_observations)
 
-        # FIXME
         # What should this be?
         # -0.5 sum(E[e_i**2] + log(2*pi)) - sum(log(uv_scale)) - sum(log(diag(mv_scale)))
         expected_log_likelihood = -torch.sum(
@@ -374,3 +377,94 @@ def test_arch_fit():
         # Again, this is just a sanity check and not a very stringent test.
         # assert abs(actual - expected) < TOLERANCE
         assert torch.abs(model_log_likelihood - expected_log_likelihood) < TOLERANCE
+
+
+SANE_MV_PARAMETERS = {
+    "dim": 2,
+    "a": [
+        [9.1489434e-01, -1.6375982e-03],
+        [-2.7170268e-04, 9.1140759e-01],
+    ],
+    "b": [
+        [0.00761922, 0.00742155],
+        [-0.00672196, -0.04194629],
+    ],
+    "c": [
+        [0.04035492, 0.01701393],
+        [0.01704365, 0.04033214],
+    ],
+    "d": [
+        [0.9995788, 0.05195547],
+        [0.05195547, 0.9995788],
+    ],
+    "sample_scale": [
+        [1.0000, 0.0000],
+        [-0.4976, 0.8674],
+    ],
+}
+
+SANE_UV_PARAMETERS = {
+    "a": [0.9482781, 0.87155545],
+    "b": [0.15232861, 0.10627481],
+    "c": [0.2793683, 0.48152938],
+    "d": [0.01429591, 0.71451986],
+    "sample_scale": [0.2501, 0.1000],
+}
+
+SANE_MEAN_PARAMETERS = {
+    "a": [0.16967115, 0.1777586],
+    "b": [0.01160183, 0.02662377],
+    "c": [0.81673557, 0.796202],
+    "d": [0.83479756, 0.59621435],
+    "sample_mean": [0.5, -0.24999999],
+}
+
+
+@pytest.fixture()
+def sane_model():
+    mean_model = ARMAMeanModel()
+    mean_model.set_parameters(**SANE_MEAN_PARAMETERS)
+
+    univariate_model = UnivariateARCHModel(mean_model=mean_model)
+    univariate_model.set_parameters(**SANE_UV_PARAMETERS)
+
+    model = MultivariateARCHModel(
+        univariate_model=univariate_model,
+        constraint=ParameterConstraint.FULL,
+    )
+    model.set_parameters(**SANE_MV_PARAMETERS)
+    return model
+
+
+@pytest.fixture()
+def random_observations():
+    SAMPLE_SIZE = 2000  # Was 2500
+    CONSTANT_MEAN = torch.tensor([0.5, -0.25])
+    CONSTANT_UV_SCALE = torch.tensor([0.25, 0.1])
+    CORRELATION = -0.5
+    CONSTANT_MV_SCALE = torch.tensor(
+        [[1.0, 0.0], [CORRELATION, sqrt(1.0 - CORRELATION**2)]]
+    )
+    random_observations = generate_observations(
+        SAMPLE_SIZE,
+        CONSTANT_MEAN,
+        CONSTANT_UV_SCALE,
+        CONSTANT_MV_SCALE,
+    )[0]
+    return random_observations
+
+
+def test_simulate(sane_model, random_observations):
+    # Check that simulate executes and returns tensors with the proper dimensions
+    output, mv_scale, uv_scale, mean = sane_model.simulate(random_observations, 10, 3)
+    assert output.shape == (3, 10, 2)
+    assert mv_scale.shape == (3, 10, 2, 2)
+    assert uv_scale.shape == output.shape
+    assert mean.shape == output.shape
+
+    # If simulation count isn't provided, first dimension should be dropped.
+    output, mv_scale, uv_scale, mean = sane_model.simulate(random_observations, 10)
+    assert output.shape == (10, 2)
+    assert mv_scale.shape == (10, 2, 2)
+    assert uv_scale.shape == output.shape
+    assert mean.shape == output.shape

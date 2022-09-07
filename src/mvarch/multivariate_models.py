@@ -553,7 +553,9 @@ class MultivariateARCHModel:
                             univariate model if one is used
         Returns:
             output: torch.Tensor - Sample model output
-            h: torch.Tensor - Sqrt of covariance used to scale the sample
+            mv_scale: torch.Tensor - Sqrt of covariance/correlation matrix used to scale the sample
+            uv_scale: torch.Tensor - Sqrt of variance used to scale the sample
+            mean: torch.Tensor - Mean
         """
         if self.a is None or self.b is None or self.c is None or self.d is None:
             raise RuntimeError(
@@ -578,6 +580,65 @@ class MultivariateARCHModel:
         )
 
         return output, mv_scale, uv_scale, uv_mean
+
+    @torch.no_grad()
+    def simulate(self, observations: Any, periods: int, samples: Optional[int] = None):
+        """
+        Performs a Monte Carlo simulation by drawing `samples` samples from the modeo
+        for the next `periods` time periods.
+        Arguments:
+            observations: Any - Observations used to determine initial state for
+                                the simulation.  The simulation will simulate the
+                                conditions immediately following the observations.
+            periods: int - Number of time periods per simulation
+            samples: int - Number of simulations to perform (one if not provided)
+        Returns:
+            output: torch.Tensor - Shape (samples, periods, dimension) containing simulated outputs
+            mv_scale: torch.Tensor - Shape (samples, periods, dimension, dimension) containing the
+                                     multivariate scaling (e.g., sqrt of correlation matrix).
+            uv_scale: torch.Tensor - Shape (samples, periods, dimension) containing univariate
+                                     scaling (e.g., sqrt of the variance)
+            mean: torch.Tensor - Shape (samples, periods, dimension) containing mean
+
+        Note: One simulation is generated and the `samples` dimension of the output is
+              dropped if samples == None
+
+        """
+        observations = to_tensor(observations)
+        initial_mv_state, initial_uv_state, initial_mean_state = self.predict(
+            observations
+        )[:3]
+
+        output_list = []
+        mv_scale_list = []
+        uv_scale_list = []
+        mean_list = []
+
+        for i in range(samples if samples is not None else 1):
+            output, mv_scale, uv_scale, mean = self.sample(
+                periods,
+                mv_scale_initial_value=initial_mv_state,
+                uv_scale_initial_value=initial_uv_state,
+                mean_initial_value=initial_mean_state,
+            )
+
+            output_list.append(output)
+            mv_scale_list.append(mv_scale)
+            uv_scale_list.append(uv_scale)
+            mean_list.append(mean)
+
+            output = torch.stack(output_list, dim=0)
+            mv_scale = torch.stack(mv_scale_list, dim=0)
+            uv_scale = torch.stack(uv_scale_list, dim=0)
+            mean = torch.stack(mean_list, dim=0)
+
+        if samples is None:
+            output = output.squeeze(0)
+            mv_scale = mv_scale.squeeze(0)
+            uv_scale = uv_scale.squeeze(0)
+            mean = mean.squeeze(0)
+
+        return output, mv_scale, uv_scale, mean
 
 
 if __name__ == "__main__":  # pragma: no cover
