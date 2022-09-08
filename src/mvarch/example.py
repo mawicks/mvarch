@@ -4,11 +4,11 @@ import torch
 import yfinance as yf  # type: ignore
 import matplotlib.pyplot as plt  # type: ignore
 
-DISTRIBUTION = "studentt"
+DISTRIBUTION = "normal"
 SIMULATION_PERIODS = 128
 
 # symbols = ("NFLX", "SPY", "TWTR", "XOM")
-symbols = ("BND", "SPY", "QQQ")
+symbols = ("BND", "SPY", "QQQ", "VNQ")
 
 data = yf.download(symbols)
 # First dropna() drops rows without data for all symbols
@@ -67,7 +67,6 @@ for i, symbol in enumerate(symbols):
     ax2[i].plot(
         range(len(tail), len(tail) + SIMULATION_PERIODS),
         simulated_adj_close[0, :, i],
-        "-.",
         label=f"{symbol} sample",
     )
     ax2[i].plot((len(tail) - 0.5) * np.array([1, 1]), ax2[i].get_ylim(), "k-.")
