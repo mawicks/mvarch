@@ -15,6 +15,8 @@ def test_normal_distribution():
     # Make sure set_parameters() can be called
     distribution.set_parameters()
 
+    assert distribution.std_dev() == 1.0
+    
     # Make sure get_parameters() can be called and
     # returns an empty dict.
     parameters = distribution.get_parameters()
@@ -37,6 +39,7 @@ def test_normal_distribution():
     assert instance.loc == 0.0
 
 
+
 def test_studentt_distribution():
     distribution = distributions.StudentTDistribution()
 
@@ -48,6 +51,8 @@ def test_studentt_distribution():
 
         # Make sure set_parameters() can be called with a `df` keyword
         distribution.set_parameters(df=df)
+
+        assert distribution.std_dev() == pytest.approx(float(df / (df - 2)))
 
         # Make sure get parmaeters() returns the df we just set.
         parameters = distribution.get_parameters()

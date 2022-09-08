@@ -20,6 +20,10 @@ class Distribution(Protocol):
         """Abstract method with no implementation."""
 
     @abstractmethod
+    def std_dev(self) -> float:
+        """Abstract method with no implementation."""
+
+    @abstractmethod
     def log_parameters(self) -> None:
         """Abstract method with no implementation."""
 
@@ -49,6 +53,9 @@ class NormalDistribution(Distribution):
     def get_parameters(self) -> Dict[str, Any]:
         return {}
 
+    def std_dev(self) -> float:
+        return 1.0
+
     def log_parameters(self) -> None:
         return
 
@@ -76,6 +83,14 @@ class StudentTDistribution(Distribution):
 
     def get_parameters(self) -> Dict[str, Any]:
         return {"df": self.df}
+
+    def std_dev(self) -> float:
+        if self.df > 2:
+            return float(self.df / (self.df - 2))
+        elif self.df > 1:
+            return float("inf")
+        else:
+            return float("nan")
 
     def log_parameters(self) -> None:
         logging.info(f"StudentT DF: {self.df:.3f}")
