@@ -52,7 +52,21 @@ def model_factory(
     univariate: str = "arch",
     constraint: str = "none",
     multivariate: str = "mvarch",
+    tune_all: bool = False,
 ):
+    """
+    Build a multivariate or univariate model.
+
+    Arguments:
+
+        distribution: str - Distribution to use: "normal" or "studentt"
+        mean: str - Mean model to use: "zero" or "arma"
+        univariate: str - Univariate model to use: "arch" or "none"
+        constraint: str - Constraints on parameters of multivariate model: "scalar", "diagonal", "triangular", or "none"
+        multivariate: str - Multivariate model to use "mvarch" or "none".  If none, only a univariate model is constructed.
+        tune_all: bool - If true, the univariate is fine-tuned while training the multivariate models.  Otherwise, they
+                         trained separately.
+    """
     distribution_type = get_choice("distribution", distribution, DISTRIBUTION_CHOICES)
     mean_type = get_choice("mean", mean, MEAN_CHOICES)
     univariate_type = get_choice("univariate", univariate, UNIVARIATE_CHOICES)
@@ -65,7 +79,9 @@ def model_factory(
 
     if multivariate_type is not None:
         model = multivariate_type(
-            univariate_model=univariate_model, constraint=constraint_type
+            univariate_model=univariate_model,
+            constraint=constraint_type,
+            tune_all=tune_all,
         )
     else:
         model = univariate_model

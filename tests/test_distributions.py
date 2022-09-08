@@ -1,5 +1,6 @@
 import pytest
 
+import numpy as np
 import torch
 
 # Local modules
@@ -16,7 +17,7 @@ def test_normal_distribution():
     distribution.set_parameters()
 
     assert distribution.std_dev() == 1.0
-    
+
     # Make sure get_parameters() can be called and
     # returns an empty dict.
     parameters = distribution.get_parameters()
@@ -37,7 +38,6 @@ def test_normal_distribution():
     # normal distribution.  We control scale and center separately.
     assert instance.scale == 1.0
     assert instance.loc == 0.0
-
 
 
 def test_studentt_distribution():
@@ -76,3 +76,21 @@ def test_studentt_distribution():
         # distribution.  We control scale and center separately.
         assert instance.scale == 1.0
         assert instance.loc == 0.0
+
+
+def test_normal_std_dev():
+    distribution = distributions.NormalDistribution()
+    assert distribution.std_dev() == 1
+
+
+def test_studentt_std_Dev():
+    distribution = distributions.StudentTDistribution()
+
+    distribution.set_parameters(df=3.0)
+    assert distribution.std_dev() == 3.0
+
+    distribution.set_parameters(df=2.0)
+    assert distribution.std_dev() == float("inf")
+
+    distribution.set_parameters(df=1.0)
+    assert np.isnan(distribution.std_dev())
