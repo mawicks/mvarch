@@ -85,8 +85,8 @@ class StudentTDistribution(Distribution):
         return {"df": self.df}
 
     def std_dev(self) -> float:
-        if self.df > 2:
-            return float(self.df / (self.df - 2))
+        if torch.abs(self.df) > 2:
+            return float(torch.abs(self.df) / torch.abs(self.df - 2))
         elif self.df > 1:
             return float("inf")
         else:
@@ -99,7 +99,7 @@ class StudentTDistribution(Distribution):
         return [self.df]
 
     def get_instance(self) -> torch.distributions.Distribution:
-        return torch.distributions.studentT.StudentT(self.df)
+        return torch.distributions.studentT.StudentT(torch.abs(self.df))
 
 
 if __name__ == "__main__":  # pragma: no cover

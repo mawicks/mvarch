@@ -104,6 +104,8 @@ class MultivariateARCHModel:
     c: Optional[Parameter]
     d: Optional[Parameter]
 
+    tune_all: bool
+
     __dim: Optional[int]
 
     def __init__(
@@ -111,6 +113,7 @@ class MultivariateARCHModel:
         constraint=ParameterConstraint.FULL,
         univariate_model: UnivariateScalingModel = UnivariateUnitScalingModel(),
         device: torch.device = None,
+        tune_all=False,
     ):
         self.constraint = constraint
         self.univariate_model = univariate_model
@@ -121,6 +124,8 @@ class MultivariateARCHModel:
         self.device = device
 
         self.a = self.b = self.c = self.d = self.__dim = None
+
+        self.tune_all = tune_all
 
         # There should be a better way to do this.  Maybe add a set_device method.
         self.univariate_model.device = device
@@ -405,6 +410,7 @@ class MultivariateARCHModel:
 
         if self.univariate_model.is_optimizable:
             self.univariate_model.fit(observations)
+            self.univariate_model.log_parameters()
             uv_scale, uv_mean = self.univariate_model.predict(observations)[2:]
             centered_observations = observations - uv_mean
             self.initialize_parameters(centered_observations / uv_scale)
@@ -426,12 +432,14 @@ class MultivariateARCHModel:
         # mean model parameters and the distribution parameters,
         # because they weren't optimized above.
 
-        if not self.univariate_model.is_optimizable:
+        if not self.univariate_model.is_optimizable or self.tune_all:
             parameters = (
                 parameters
                 + self.univariate_model.mean_model.get_optimizable_parameters()
                 + self.distribution.get_optimizable_parameters()
             )
+        if self.tune_all:
+            parameters = parameters + self.univariate_model.get_optimizable_parameters()
 
         optim = torch.optim.LBFGS(
             parameters,
@@ -451,10 +459,12 @@ class MultivariateARCHModel:
 
             optim.zero_grad()
 
-            # If the underlying univariate model is being optimized,
+            # If the mean model and distribution in the
+            # underlying univariate model are being optimized (which happens
+            # When the univariate model itself is *not* optimizable,
             # then the univariate predictions must be recomputed here.
             # Otherwise they come from above.
-            if self.univariate_model.is_optimizable:
+            if self.univariate_model.is_optimizable and not self.tune_all:
                 assert isinstance(centered_observations, torch.Tensor)
                 assert isinstance(uv_scale, torch.Tensor)
 
@@ -468,16 +478,12 @@ class MultivariateARCHModel:
                 closure_uv_scale = self.univariate_model._predict(
                     closure_centered_observations
                 )[1]
-                closure_centered_observations = (
-                    closure_centered_observations / closure_uv_scale
-                )
 
             # Do not use scaled observations here; centering is okay.
             loss = -self.__mean_log_likelihood(
                 closure_centered_observations, uv_scale=closure_uv_scale
             )
             loss.backward()
-
             return float(loss)
 
         optimize(optim, loss_closure, "multivariate model")
