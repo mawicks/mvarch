@@ -157,6 +157,7 @@ disable=all
 enable=enable=bad-indentation,  # Used when an unexpected number of indentation’s tabulations or spaces has been found.
        mixed-indentation,       # Used when there are some mixed tabs and spaces in a module.
        unused-variable,
+       unused-import,
        c-extension-no-member,
        line-too-long
 
