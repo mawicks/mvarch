@@ -1,6 +1,5 @@
 import mvarch
 import numpy as np
-import torch
 import yfinance as yf  # type: ignore
 import matplotlib.pyplot as plt  # type: ignore
 
