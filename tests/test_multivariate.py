@@ -23,6 +23,7 @@ from mvarch.parameters import ParameterConstraint
 # Local testing tools.
 from . import utils
 
+MANUAL_SEED = 42
 
 # These aren't realistic values.  They're just some nice whole numbers for testing.
 # We use a dimension of two with independent values because otherwise we wouldn't catch
@@ -230,6 +231,7 @@ def generate_observations(
     ):
         raise ValueError("Vectors must conform")
 
+    torch.manual_seed(MANUAL_SEED)
     white_noise = torch.randn((sample_size, mean_vector.shape[0]))
     # Correct sample mean, sample variance, and orthogonality slightly so that the
     # sample statistics are what we want.

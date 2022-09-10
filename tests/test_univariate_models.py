@@ -18,6 +18,8 @@ from mvarch.univariate_models import (
 # Local testing tools
 from . import utils
 
+MANUAL_SEED = 42
+
 
 def check_constant_prediction(
     model, observations, constant_scale_value, constant_mean_value
@@ -258,6 +260,7 @@ def test_arch_fit():
     # The tolerance hasn't been chosen very scientifically.  The sample size
     # Is fairly small for a quick test so it won't be tight.
 
+    torch.manual_seed(MANUAL_SEED)
     random_observations = torch.randn((SAMPLE_SIZE, 1))
 
     # The sample variance is random.  Scale the sample so that the
@@ -348,6 +351,7 @@ def generate_observations(
     if mean_vector.shape != uv_scale.shape:
         raise ValueError("Vectors must conform")
 
+    torch.manual_seed(MANUAL_SEED)
     white_noise = torch.randn((sample_size, mean_vector.shape[0]))
     # Correct sample mean, sample variance, and orthogonality slightly so that the
     # sample statistics are what we want.
