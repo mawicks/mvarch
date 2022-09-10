@@ -20,6 +20,10 @@ class Distribution(Protocol):
         """Abstract method with no implementation."""
 
     @abstractmethod
+    def std_dev(self) -> float:
+        """Abstract method with no implementation."""
+
+    @abstractmethod
     def log_parameters(self) -> None:
         """Abstract method with no implementation."""
 
@@ -49,6 +53,9 @@ class NormalDistribution(Distribution):
     def get_parameters(self) -> Dict[str, Any]:
         return {}
 
+    def std_dev(self) -> float:
+        return 1.0
+
     def log_parameters(self) -> None:
         return
 
@@ -77,6 +84,14 @@ class StudentTDistribution(Distribution):
     def get_parameters(self) -> Dict[str, Any]:
         return {"df": self.df}
 
+    def std_dev(self) -> float:
+        if torch.abs(self.df) > 2:
+            return float(torch.abs(self.df) / torch.abs(self.df - 2))
+        elif self.df > 1:
+            return float("inf")
+        else:
+            return float("nan")
+
     def log_parameters(self) -> None:
         logging.info(f"StudentT DF: {self.df:.3f}")
 
@@ -84,7 +99,7 @@ class StudentTDistribution(Distribution):
         return [self.df]
 
     def get_instance(self) -> torch.distributions.Distribution:
-        return torch.distributions.studentT.StudentT(self.df)
+        return torch.distributions.studentT.StudentT(torch.abs(self.df))
 
 
 if __name__ == "__main__":  # pragma: no cover

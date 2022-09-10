@@ -231,6 +231,56 @@ class UnivariateScalingModel(Protocol):
         output = scaled_noise + mu
         return output, scale, mu
 
+    @torch.no_grad()
+    def simulate(self, observations: Any, periods: int, samples: Optional[int] = None):
+        """
+        Performs a Monte Carlo simulation by drawing `samples` samples from the modeo
+        for the next `periods` time periods.
+        Arguments:
+            observations: Any - Observations used to determine initial state for
+                                the simulation.  The simulation will simulate the
+                                conditions immediately following the observations.
+            periods: int - Number of time periods per simulation
+            samples: int - Number of simulations to perform (one if not provided)
+        Returns:
+            output: torch.Tensor - Shape (samples, periods, dimension) containing simulated outputs
+            scale: torch.Tensor - Shape (samples, periods, dimension) containing univariate
+                                  scaling (e.g., sqrt of the variance)
+            mean: torch.Tensor - Shape (samples, periods, dimension) containing mean
+
+        Note: One simulation is generated and the `samples` dimension of the output is
+              dropped if samples == None
+
+        """
+        observations = to_tensor(observations)
+        initial_scale_state, initial_mean_state = self.predict(observations)[:2]
+
+        output_list = []
+        scale_list = []
+        mean_list = []
+
+        for _ in range(samples if samples is not None else 1):
+            output, scale, mean = self.sample(
+                periods,
+                scale_initial_value=initial_scale_state,
+                mean_initial_value=initial_mean_state,
+            )
+
+            output_list.append(output)
+            scale_list.append(scale)
+            mean_list.append(mean)
+
+            output = torch.stack(output_list, dim=0)
+            scale = torch.stack(scale_list, dim=0)
+            mean = torch.stack(mean_list, dim=0)
+
+        if samples is None:
+            output = output.squeeze(0)
+            scale = scale.squeeze(0)
+            mean = mean.squeeze(0)
+
+        return output, scale, mean
+
 
 class UnivariateUnitScalingModel(UnivariateScalingModel):
     distribution: Distribution

@@ -104,6 +104,8 @@ class MultivariateARCHModel:
     c: Optional[Parameter]
     d: Optional[Parameter]
 
+    tune_all: bool
+
     __dim: Optional[int]
 
     def __init__(
@@ -111,6 +113,7 @@ class MultivariateARCHModel:
         constraint=ParameterConstraint.FULL,
         univariate_model: UnivariateScalingModel = UnivariateUnitScalingModel(),
         device: torch.device = None,
+        tune_all=False,
     ):
         self.constraint = constraint
         self.univariate_model = univariate_model
@@ -121,6 +124,8 @@ class MultivariateARCHModel:
         self.device = device
 
         self.a = self.b = self.c = self.d = self.__dim = None
+
+        self.tune_all = tune_all
 
         # There should be a better way to do this.  Maybe add a set_device method.
         self.univariate_model.device = device
@@ -405,6 +410,7 @@ class MultivariateARCHModel:
 
         if self.univariate_model.is_optimizable:
             self.univariate_model.fit(observations)
+            self.univariate_model.log_parameters()
             uv_scale, uv_mean = self.univariate_model.predict(observations)[2:]
             centered_observations = observations - uv_mean
             self.initialize_parameters(centered_observations / uv_scale)
@@ -426,12 +432,14 @@ class MultivariateARCHModel:
         # mean model parameters and the distribution parameters,
         # because they weren't optimized above.
 
-        if not self.univariate_model.is_optimizable:
+        if not self.univariate_model.is_optimizable or self.tune_all:
             parameters = (
                 parameters
                 + self.univariate_model.mean_model.get_optimizable_parameters()
                 + self.distribution.get_optimizable_parameters()
             )
+        if self.tune_all:
+            parameters = parameters + self.univariate_model.get_optimizable_parameters()
 
         optim = torch.optim.LBFGS(
             parameters,
@@ -451,10 +459,12 @@ class MultivariateARCHModel:
 
             optim.zero_grad()
 
-            # If the underlying univariate model is being optimized,
+            # If the mean model and distribution in the
+            # underlying univariate model are being optimized (which happens
+            # When the univariate model itself is *not* optimizable,
             # then the univariate predictions must be recomputed here.
             # Otherwise they come from above.
-            if self.univariate_model.is_optimizable:
+            if self.univariate_model.is_optimizable and not self.tune_all:
                 assert isinstance(centered_observations, torch.Tensor)
                 assert isinstance(uv_scale, torch.Tensor)
 
@@ -468,16 +478,12 @@ class MultivariateARCHModel:
                 closure_uv_scale = self.univariate_model._predict(
                     closure_centered_observations
                 )[1]
-                closure_centered_observations = (
-                    closure_centered_observations / closure_uv_scale
-                )
 
             # Do not use scaled observations here; centering is okay.
             loss = -self.__mean_log_likelihood(
                 closure_centered_observations, uv_scale=closure_uv_scale
             )
             loss.backward()
-
             return float(loss)
 
         optimize(optim, loss_closure, "multivariate model")
@@ -553,7 +559,9 @@ class MultivariateARCHModel:
                             univariate model if one is used
         Returns:
             output: torch.Tensor - Sample model output
-            h: torch.Tensor - Sqrt of covariance used to scale the sample
+            mv_scale: torch.Tensor - Sqrt of covariance/correlation matrix used to scale the sample
+            uv_scale: torch.Tensor - Sqrt of variance used to scale the sample
+            mean: torch.Tensor - Mean
         """
         if self.a is None or self.b is None or self.c is None or self.d is None:
             raise RuntimeError(
@@ -578,6 +586,65 @@ class MultivariateARCHModel:
         )
 
         return output, mv_scale, uv_scale, uv_mean
+
+    @torch.no_grad()
+    def simulate(self, observations: Any, periods: int, samples: Optional[int] = None):
+        """
+        Performs a Monte Carlo simulation by drawing `samples` samples from the modeo
+        for the next `periods` time periods.
+        Arguments:
+            observations: Any - Observations used to determine initial state for
+                                the simulation.  The simulation will simulate the
+                                conditions immediately following the observations.
+            periods: int - Number of time periods per simulation
+            samples: int - Number of simulations to perform (one if not provided)
+        Returns:
+            output: torch.Tensor - Shape (samples, periods, dimension) containing simulated outputs
+            mv_scale: torch.Tensor - Shape (samples, periods, dimension, dimension) containing the
+                                     multivariate scaling (e.g., sqrt of correlation matrix).
+            uv_scale: torch.Tensor - Shape (samples, periods, dimension) containing univariate
+                                     scaling (e.g., sqrt of the variance)
+            mean: torch.Tensor - Shape (samples, periods, dimension) containing mean
+
+        Note: One simulation is generated and the `samples` dimension of the output is
+              dropped if samples == None
+
+        """
+        observations = to_tensor(observations)
+        initial_mv_state, initial_uv_state, initial_mean_state = self.predict(
+            observations
+        )[:3]
+
+        output_list = []
+        mv_scale_list = []
+        uv_scale_list = []
+        mean_list = []
+
+        for _ in range(samples if samples is not None else 1):
+            output, mv_scale, uv_scale, mean = self.sample(
+                periods,
+                mv_scale_initial_value=initial_mv_state,
+                uv_scale_initial_value=initial_uv_state,
+                mean_initial_value=initial_mean_state,
+            )
+
+            output_list.append(output)
+            mv_scale_list.append(mv_scale)
+            uv_scale_list.append(uv_scale)
+            mean_list.append(mean)
+
+            output = torch.stack(output_list, dim=0)
+            mv_scale = torch.stack(mv_scale_list, dim=0)
+            uv_scale = torch.stack(uv_scale_list, dim=0)
+            mean = torch.stack(mean_list, dim=0)
+
+        if samples is None:
+            output = output.squeeze(0)
+            mv_scale = mv_scale.squeeze(0)
+            uv_scale = uv_scale.squeeze(0)
+            mean = mean.squeeze(0)
+
+        return output, mv_scale, uv_scale, mean
 
 
 if __name__ == "__main__":  # pragma: no cover
