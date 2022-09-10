@@ -162,6 +162,5 @@ the following plots (details showing how plots were constructed are in [example.
 
 ![Monte Carlo Simulation](figures/fig2.png)
 
-```
 
 
