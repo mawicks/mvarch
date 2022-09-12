@@ -101,7 +101,7 @@ print(f"Likelihood: {model.mean_log_likelihood(fit_history):.4f}")
 On 2022-09-12, you might see something like:
 
 ```
->>> Likelihood: 15.2868
+Likelihood: 15.2868
 ```
 
 ### Using the model
@@ -136,7 +136,7 @@ previous days from history and also for the next business day:
 
 print(
     f"Next day volatility prediction (annualized):\n"
-    f"{(np.sqrt(252.) * uv_scale_predicted * model.distribution.std_dev()).numpy()}"
+    f"{(np.sqrt(252.) * uv_scale_predicted * model.distribution.std_dev()).numpy()}\n"
 )
 
 print(
@@ -148,9 +148,10 @@ print(
 
 On 2022-09-12, you might see something like:
 ```
->>> Next day volatility prediction (annualized):
+Next day volatility prediction (annualized):
 [0.24272123 0.30139446 0.08419606 0.2395135 ]
->>> >>> ... ... ... Next day correlation prediction:
+
+Next day correlation prediction:
 [[1.         0.9603142  0.12006433 0.7841618 ]
  [0.9603142  1.         0.14455643 0.7046279 ]
  [0.12006433 0.14455643 1.         0.22765702]
@@ -184,7 +185,7 @@ std_dev = np.std(simulated_returns, axis=0)[SIMULATION_PERIODS - 1]
 # Calculate the correlation coefficiens from the simulation:
 corr_coef = np.corrcoef(simulated_returns[:, SIMULATION_PERIODS - 1, :], rowvar=False)
 print(
-    f"Std dev over simulation period ({SIMULATION_PERIODS} days) total returns:\n{std_dev}"
+    f"Std dev over simulation period ({SIMULATION_PERIODS} days) total returns:\n{std_dev}\n"
 )
 print(
     f"Correlation over simulation period ({SIMULATION_PERIODS} days) total returns:\n{corr_coef}"
@@ -195,9 +196,10 @@ print(
 On 2022-09-12, you might see something like:
 
 ```
->>> Std dev over simulation period (126 days) total returns:
+Std dev over simulation period (126 days) total returns:
 [0.15605381 0.18821143 0.03908034 0.18603522]
->>> ... ... Correlation over simulation period (126 days) total returns:
+
+Correlation over simulation period (126 days) total returns:
 [[ 1.          0.91632208 -0.08541442  0.69823601]
  [ 0.91632208  1.         -0.03951417  0.57860402]
  [-0.08541442 -0.03951417  1.          0.02317722]
