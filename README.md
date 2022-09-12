@@ -98,6 +98,8 @@ model.fit(fit_history)
 print(f"Likelihood: {model.mean_log_likelihood(fit_history):.4f}")
 ```
 
+### Using the model
+
 Run the model on a subset ('tail') of the data for a couple of different use cases
 such as
   1. historical volatility over time and next day prediction; and
