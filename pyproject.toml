@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "mvarch"
-version = "0.0.1"
-description = "Multivariate Volatility Models (ARCH) for stock prices and other time series"
+version = "0.1.0"
+description = "Multivariate Volatility Models (ARCH/GARCH) for stock prices and other time series"
 authors = ["Mark A Wicks <mawicks@gmail.com>"]
 readme = "README.md"
 
