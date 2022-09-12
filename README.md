@@ -74,7 +74,7 @@ fit_history = df.values
 
 ```
 
-Construct a model using `model_factory()`.  Distribtuion may be 'studentt' or 'normal'.
+Construct a model using `model_factory()`.  Distribution may be 'studentt' or 'normal'.
 The mean mode can be 'zero', 'arma', or 'constant'.  It's difficult to estiamte
 the daily mean, which is small compared to the daily variance.  A resonable choice is
 to model the mean as 'zero'.  Constraints may be 'scalar', 'diagonal', 'triangular', or
@@ -89,8 +89,8 @@ model.fit(fit_history)
 print(f"Likelihood: {model.mean_log_likelihood(fit_history):.4f}")
 ```
 
-Run the model on a subset of the data for a couple of different use cases such as
- 1) historical volatility over time and next day prediction and 2) Forecasting using
+Run the model on a subset of the data for a couple of different use cases
+such as 1) historical volatility over time and next day prediction and 2) Forecasting using
 Monte Carlo simulation.
 
 First grab a subset of the data:
