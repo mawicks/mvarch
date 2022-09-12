@@ -49,20 +49,29 @@ a `git clone` checkout, or by running `pip install` and providing a URL for the 
 
 We will train a model on historic data for a small set of stock symbols.
 
-First import the prerequisites:
+First import some prerequisites:
 
 ```python
 # Prerequisites
 import mvarch
 import numpy as np
 import yfinance as yf  # type: ignore
-
-symbols = ("SPY", "QQQ", "BND", "VNQ")
-
 ```
+
+Construct a model using `model_factory()`.  Distribution may be 'studentt' or 'normal'.
+The mean mode can be 'zero', 'arma', or 'constant'.  It's difficult to estiamte
+the daily mean, which is small compared to the daily variance, so a resonable choice is
+to model the mean as 'zero'.  Constraints (in increasing order of computational complexity)
+may be 'scalar', 'diagonal', 'triangular', or 'none'
+
+```python
+model = mvarch.model_factory(distribution="studentt", mean="zero", constraint="none")
+```
+
 Download some historic data for the above symbols.
 
 ```python
+symbols = ("SPY", "QQQ", "BND", "VNQ")
 data = yf.download(symbols)
 
 # Grab historic price history for the symbols above
@@ -74,35 +83,30 @@ fit_history = df.values
 
 ```
 
-Construct a model using `model_factory()`.  Distribution may be 'studentt' or 'normal'.
-The mean mode can be 'zero', 'arma', or 'constant'.  It's difficult to estiamte
-the daily mean, which is small compared to the daily variance.  A resonable choice is
-to model the mean as 'zero'.  Constraints may be 'scalar', 'diagonal', 'triangular', or
-'none'
-```python
-model = mvarch.model_factory(distribution="studentt", mean="zero", constraint="none")
+Fit the model (This may take a while. Consider subsetting the history with
+`fit_history = df.values[-100:]` or something similar.)
 
-# Fit the modelo
-print("starting fit()...")
-model.tune_all = True
+```pythonp
 model.fit(fit_history)
 print(f"Likelihood: {model.mean_log_likelihood(fit_history):.4f}")
 ```
 
-Run the model on a subset of the data for a couple of different use cases
+Run the model on a subset of the 'tail' of the data for a couple of different use cases
 such as
-  1. historical volatility over time and next day prediction and
+  1. historical volatility over time and next day prediction; and
   2. Forecasting using Monte Carlo simulation.
 
-First grab a subset of the data:
+First 'tail' the data:
+
 ```python
 evaluate_tail = df.index[-500:]
 evaluate_history = df.loc[evaluate_tail].values
 ```
 
-Run `predict()` on the data subset to make historical predictions and also next-day predictions.
-Get correlation, std deviation, and mean estimates for
+Run `predict()` on the data subset to make historical predictions and also
+next-day predictions. Get correlation, std deviation, and mean estimates for
 previous days from history and also for the next business day:
+
 ```python
 (
     mv_scale_predicted,
@@ -113,14 +117,16 @@ previous days from history and also for the next business day:
     mean_history,
 ) = model.predict(evaluate_history)
 
-# Predicted next day correlations:
-print(
-    f"Next day correlation prediction:\n"
-    f"{(mv_scale_predicted @ mv_scale_predicted.T).numpy()}"
-)
+# Show predicted next day volatilities and correlations:
+
 print(
     f"Next day volatility prediction (annualized):\n"
     f"{(np.sqrt(252.) * uv_scale_predicted * model.distribution.std_dev()).numpy()}"
+)
+
+print(
+    f"Next day correlation prediction:\n"
+    f"{(mv_scale_predicted @ mv_scale_predicted.T).numpy()}"
 )
 
 ```
