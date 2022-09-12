@@ -213,6 +213,7 @@ Plots showing historic prices and *simulated* future prices obtained from this d
 in the following plots (code used to construct plots is in [example.py](/src/mvarch/example.py).
 Note that SPY and QQQ are strongly correlated 
 with one another, VNQ is somewhat correlated with SPY and QQQ,  and BND is not very correlated with the others.
+These correlations appear in the historic data as well as the simulated data.
 
 ![Monte Carlo Simulation](figures/fig2.png)
 
