@@ -205,7 +205,7 @@ Std dev of simulation period (126 days) total returns:
 ```
 
 Plots showing historic prices and *simulated* future prices obtained from this data are shown
-in the following plots (predicse code used to construct plots is in [example.py](/src/mvarch/example.py).  Note that SPY and QQQ are strongly correlated
+in the following plots (code used to construct plots is in [example.py](/src/mvarch/example.py).  Note that SPY and QQQ are strongly correlated
 and BND is not very correlated with either of them:
 
 ![Monte Carlo Simulation](figures/fig2.png)
