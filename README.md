@@ -159,7 +159,7 @@ Next day correlation prediction:
 ```
 
 A sample plot of historic volatility obtained from this data follows
-(code used to construct plots shown in [example.py](/src/mvarch/example.py):
+(code used to construct plots shown in [example.py](/src/mvarch/example.py)):
 
 ![Historic Volatility](figures/fig1.png)
 
@@ -210,7 +210,7 @@ Correlation of total returns over simulation period (126 days):
 ```
 
 Plots showing historic prices and *simulated* future prices obtained from this data are shown
-in the following plots (code used to construct plots is in [example.py](/src/mvarch/example.py).
+in the following plots (code used to construct plots is in [example.py](/src/mvarch/example.py)).
 Note that SPY and QQQ are strongly correlated 
 with one another, VNQ is somewhat correlated with SPY and QQQ,  and BND is not very correlated with the others.
 These correlations appear in the historic data as well as the simulated data.
