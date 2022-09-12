@@ -6,7 +6,8 @@ This package uses a simple model for multivariate (and univariate) volatility (A
 
 ## Motivation
 
-A number of multivariate volatility models exist in the literature (DCC, VECC, BEKK,  etc.).
+A number of multivariate volatility models for time series of asset prices
+exist in the literature (DCC, VECC, BEKK,  etc.).
 This package uses a general specification that includes a number of common models.
 Using this package you can generate either a DCC model or a BEKK model.
 
