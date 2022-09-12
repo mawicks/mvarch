@@ -140,12 +140,12 @@ def run(
 
     # Predict one more time with optimal parameters.
     (
-        mv_scale,
-        uv_scale,
-        mu,
         mv_scale_next,
         uv_scale_next,
         mu_next,
+        mv_scale,
+        uv_scale,
+        mu,
     ) = multivariate_model.predict(observations)
     print("mu_next: \n", mu_next)
 

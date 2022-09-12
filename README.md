@@ -83,8 +83,9 @@ fit_history = df.values
 
 ```
 
-Fit the model (This may take a while. Consider subsetting the history with
-`fit_history = df.values[-100:]` or something similar.)
+Fit the model (This may take a while. Consider subsetting the history by, for example, 
+`fit_history = df.values[-100:]` or reducing the complexity by modifying `constraint`
+in the call to `model_factory()` to  `scalar` or `diagonal`.)
 
 ```pythonp
 model.fit(fit_history)
@@ -138,7 +139,9 @@ A sample plot of historic volatility obtained from this data follows
 
 Get simulated results using a Monte Carlo simulation for the next
 `SIMULATION_PERIODS` days, by drawing sampling the model output
-for `SIMULATION_SAMPLES` times.
+for `SIMULATION_SAMPLES` times.  The resulting standard deviations and correlations
+could be fed into a portfolio optimization routine that chooses an allocation among
+the symbols that minimizes the standard deviation subject to some other constraints (e.g., return).
 
 ```python
 
@@ -146,7 +149,7 @@ SIMULATION_PERIODS = 126
 SIMULATION_SAMPLES = 1000
 
 simulated, mv_scale, uv_scale, mean = model.simulate(
-    evaluate_history, SIMULATION_PERIODS, 1000
+    evaluate_history, SIMULATION_PERIODS, SIMULATION_SAMPLES
 )
 simulated_returns = np.exp(np.cumsum(simulated.numpy(), axis=1))
 # Note: Return value has shape (SIMULATION_SAMPLES, SIMULATION_PERIODS, STOCK_SYMBOLS)
