@@ -98,6 +98,12 @@ model.fit(fit_history)
 print(f"Likelihood: {model.mean_log_likelihood(fit_history):.4f}")
 ```
 
+On 2022-09-12, you might see something like:
+
+```
+>>> Likelihood: 15.2868
+```
+
 ### Using the model
 
 Run the model on a subset ('tail') of the data for a couple of different use cases
@@ -140,6 +146,17 @@ print(
 
 ```
 
+On 2022-09-12, you might see something like:
+```
+Next day volatility prediction (annualized):
+[0.24272123 0.30139446 0.08419606 0.2395135 ]
+>>> >>> ... ... ... Next day correlation prediction:
+[[1.         0.9603142  0.12006433 0.7841618 ]
+ [0.9603142  1.         0.14455643 0.7046279 ]
+ [0.12006433 0.14455643 1.         0.22765702]
+ [0.7841618  0.7046279  0.22765702 0.9999998 ]]
+```
+
 A sample plot of historic volatility obtained from this data follows
 (code used to construct plots shown in [example.py](/src/mvarch/example.py):
 
@@ -175,8 +192,21 @@ print(
 
 ```
 
+On 2022-09-12, you might see something like:
+
+```
+Std dev of simulation period (126 days) total returns:
+[0.15605381 0.18821143 0.03908034 0.18603522]
+>>> ... ... Correlation of simulation period (126 days) total returns:
+[[ 1.          0.91632208 -0.08541442  0.69823601]
+ [ 0.91632208  1.         -0.03951417  0.57860402]
+ [-0.08541442 -0.03951417  1.          0.02317722]
+ [ 0.69823601  0.57860402  0.02317722  1.        ]]
+```
+
 Plots showing historic prices and *simulated* future prices obtained from this data are shown
-in the following plots (predicse code used to construct plots is in [example.py](/src/mvarch/example.py):
+in the following plots (predicse code used to construct plots is in [example.py](/src/mvarch/example.py).  Note that SPY and QQQ are strongly correlated
+and BND is not very correlated with either of them:
 
 ![Monte Carlo Simulation](figures/fig2.png)
 
