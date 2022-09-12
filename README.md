@@ -164,8 +164,11 @@ A sample plot of historic volatility obtained from this data follows
 ![Historic Volatility](figures/fig1.png)
 
 Get simulated results using a Monte Carlo simulation for the next
-`SIMULATION_PERIODS` days, by drawing sampling the model output
-for `SIMULATION_SAMPLES` times.  The resulting standard deviations and correlations
+`SIMULATION_PERIODS` days, by sampling the model output
+for `SIMULATION_SAMPLES` times.  Note that we compute the total
+return over the simulation period by using `exp(cumsum)` which is
+different from just the sum of the log returns.
+The resulting standard deviations and correlations
 could be fed into a portfolio optimization routine that chooses an allocation among
 the symbols that minimizes the standard deviation subject to some other constraints (e.g., return).
 
