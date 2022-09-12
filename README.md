@@ -98,7 +98,7 @@ model.fit(fit_history)
 print(f"Likelihood: {model.mean_log_likelihood(fit_history):.4f}")
 ```
 
-On 2022-09-12, you might see something like:
+If you ran this code on 2022-09-12, you might see something like:
 
 ```
 Likelihood: 15.2868
@@ -146,7 +146,7 @@ print(
 
 ```
 
-On 2022-09-12, you might see something like:
+If you ran this code on 2022-09-12, you might see something like:
 ```
 Next day volatility prediction (annualized):
 [0.24272123 0.30139446 0.08419606 0.2395135 ]
@@ -196,7 +196,7 @@ print(
 
 ```
 
-On 2022-09-12, you might see something like:
+If you ran this code on 2022-09-12, you might see something like:
 
 ```
 Std dev of total returns over simulation period (126 days):
