@@ -188,10 +188,10 @@ std_dev = np.std(simulated_returns, axis=0)[SIMULATION_PERIODS - 1]
 # Calculate the correlation coefficiens from the simulation:
 corr_coef = np.corrcoef(simulated_returns[:, SIMULATION_PERIODS - 1, :], rowvar=False)
 print(
-    f"Std dev over simulation period ({SIMULATION_PERIODS} days) total returns:\n{std_dev}\n"
+    f"Std dev of total returns over simulation period ({SIMULATION_PERIODS} days):\n{std_dev}\n"
 )
 print(
-    f"Correlation over simulation period ({SIMULATION_PERIODS} days) total returns:\n{corr_coef}"
+    f"Correlation of total returns over simulation period ({SIMULATION_PERIODS} days):\n{corr_coef}"
 )
 
 ```
@@ -199,10 +199,10 @@ print(
 On 2022-09-12, you might see something like:
 
 ```
-Std dev over simulation period (126 days) total returns:
+Std dev of total returns over simulation period (126 days):
 [0.15605381 0.18821143 0.03908034 0.18603522]
 
-Correlation over simulation period (126 days) total returns:
+Correlation of total returns over simulation period (126 days):
 [[ 1.          0.91632208 -0.08541442  0.69823601]
  [ 0.91632208  1.         -0.03951417  0.57860402]
  [-0.08541442 -0.03951417  1.          0.02317722]
