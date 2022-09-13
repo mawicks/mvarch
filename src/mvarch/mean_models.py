@@ -260,9 +260,9 @@ class ARMAMeanModel(MeanModel):
         if not isinstance(c, torch.Tensor):
             c = to_tensor(c, device=self.device, requires_grad=True)
         if not isinstance(d, torch.Tensor):
-            d = to_tensor(d, dtype=torch.float, device=self.device, requires_grad=True)
+            d = to_tensor(d, device=self.device, requires_grad=True)
         if not isinstance(sample_mean, torch.Tensor):
-            sample_mean = to_tensor(sample_mean, dtype=torch.float)
+            sample_mean = to_tensor(sample_mean, device=self.device)
 
         if (
             len(a.shape) != 1
