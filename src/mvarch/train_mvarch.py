@@ -176,8 +176,6 @@ def run(
             inverse_predicted_sigma @ predicted_covariance @ inverse_predicted_sigma
         )
     else:
-        sigma = uv_scale
-        predicted_sigma = uv_scale_next
         covariance = predicted_covariance = correlation = predicted_correlation = None
 
     safe_reference = lambda x: x.numpy if x is not None else None
