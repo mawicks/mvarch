@@ -58,8 +58,6 @@ def prepare_data(
     training_data = full_history.loc[
         start_date:end_date, (symbol_list, "log_return")  # type: ignore
     ]
-    print(training_data.columns)
-
     return training_data
 
 
@@ -82,19 +80,19 @@ def run(
     # Rewrite symbols with deduped, uppercase versions
     symbols = list(map(str.upper, set(symbols)))
 
-    logging.info(f"device: {device}")
-    logging.info(f"symbols: {symbols}")
-    logging.info(f"refresh: {refresh}")
-    logging.info(f"Seed: {seed}")
-    logging.info(f"Start date: {start_date}")
-    logging.info(f"End date: {end_date}")
-    logging.info(f"Evaluation/termination start date: {eval_start_date}")
-    logging.info(f"Evaluation/termination end date: {eval_end_date}")
-    logging.info(f"Mean model: {mean}")
-    logging.info(f"Univariate model: {univariate}")
-    logging.info(f"Multivariate model: {multivariate}")
-    logging.info(f"Distribution: {distribution}")
-    logging.info(f"Device: {device}")
+    logging.debug(f"device: {device}")
+    logging.debug(f"symbols: {symbols}")
+    logging.debug(f"refresh: {refresh}")
+    logging.debug(f"Seed: {seed}")
+    logging.debug(f"Start date: {start_date}")
+    logging.debug(f"End date: {end_date}")
+    logging.debug(f"Evaluation/termination start date: {eval_start_date}")
+    logging.debug(f"Evaluation/termination end date: {eval_end_date}")
+    logging.debug(f"Mean model: {mean}")
+    logging.debug(f"Univariate model: {univariate}")
+    logging.debug(f"Multivariate model: {multivariate}")
+    logging.debug(f"Distribution: {distribution}")
+    logging.debug(f"Device: {device}")
 
     data_store = FileSystemStore("training_data")
     if use_hsmd:
@@ -114,10 +112,9 @@ def run(
         eval_start_date=eval_start_date,
         eval_end_date=eval_end_date,
     )
-    logging.info(f"training_data:\n {training_data}")
-
+    logging.debug(f"training_data:\n {training_data}")
     observations = torch.tensor(training_data.values, dtype=torch.float, device=device)
-    logging.info(f"observations:\n {observations}")
+    logging.debug(f"observations:\n {observations}")
 
     model = model_factory(
         distribution=distribution,
@@ -138,67 +135,21 @@ def run(
         (
             mv_scale_next,
             uv_scale_next,
-            mu_next,
+            mean_next,
             mv_scale,
             uv_scale,
-            mu,
+            mean,
         ) = result
     else:
         (
             uv_scale_next,
-            mu_next,
+            mean_next,
             uv_scale,
-            mu,
+            mean,
         ) = result
         mv_scale_next = mv_scale = None
-    print("mu_next: \n", mu_next)
 
     torch.save(multivariate, "model.pt")
-    print("mv_scale: ", mv_scale.shape if mv_scale is not None else None)
-
-    # Compute some useful quantities to display and to record
-    if mv_scale is not None:
-        total_scale = uv_scale.unsqueeze(2).expand(mv_scale.shape) * mv_scale
-        covariance = total_scale @ torch.transpose(total_scale, 1, 2)
-        total_scale_predicted = (
-            uv_scale_next.unsqueeze(1).expand(mv_scale_next.shape) * mv_scale_next
-        )
-        predicted_covariance = total_scale_predicted @ total_scale_predicted.T
-
-        sigma = torch.sqrt(torch.diagonal(covariance, dim1=1, dim2=2))
-        predicted_sigma = torch.sqrt(torch.diag(predicted_covariance))
-
-        inverse_sigma = torch.diag_embed(sigma ** (-1), dim1=1, dim2=2)
-        inverse_predicted_sigma = torch.diag(predicted_sigma ** (-1))
-
-        correlation = inverse_sigma @ covariance @ inverse_sigma
-        predicted_correlation = (
-            inverse_predicted_sigma @ predicted_covariance @ inverse_predicted_sigma
-        )
-    else:
-        covariance = predicted_covariance = correlation = predicted_correlation = None
-
-    safe_reference = lambda x: x.numpy if x is not None else None
-    result = {
-        "transformation": safe_reference(mv_scale),
-        "predicted_mv_scale": safe_reference(mv_scale_next),
-        "uv_scale": safe_reference(uv_scale),
-        "predicted_uv_scale": safe_reference(uv_scale_next),
-        "covariance": safe_reference(covariance),
-        "predicted_covariance": safe_reference(predicted_covariance),
-        "correlation": safe_reference(correlation),
-        "predicted_correlation": safe_reference(predicted_correlation),
-        "training_data": training_data,
-    }
-
-    torch.save(result, "mgarch_output.pt")
-
-    logging.info(
-        f"MV transformation estimates:\n{mv_scale if mv_scale is not None else None}"
-    )
-    logging.info(f"UV scale estiamtes:\n{uv_scale}")
-    logging.info(f"mean estiamtes:\n{mu}")
-    logging.info(f"correlations:\n{correlation}")
 
 
 @click.command()

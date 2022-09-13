@@ -115,13 +115,9 @@ class UnivariateScalingModel(Protocol):
 
     def fit(self, observations: torch.Tensor) -> None:
         observations = to_tensor(observations, device=self.device)
-        self.distribution.log_parameters()
 
         self.mean_model.initialize_parameters(observations)
-        self.mean_model.log_parameters()
-
         self.initialize_parameters(observations)
-        self.log_parameters()
 
         model_parameters = self.get_optimizable_parameters()
         if len(model_parameters) == 0:
@@ -457,14 +453,13 @@ class UnivariateARCHModel(UnivariateScalingModel):
     def log_parameters(self) -> None:
         if self.a and self.b and self.c and self.d and self.sample_scale is not None:
             logging.info(
-                "Univariate variance model\n"
+                f"Univariate ARCH model parameters:\n"
                 f"a: {self.a.value.detach().numpy()}, "
                 f"b: {self.b.value.detach().numpy()}, "
                 f"c: {self.c.value.detach().numpy()}, "
                 f"d: {self.d.value.detach().numpy()}, "
                 f"sample_scale: {self.sample_scale.numpy()}"
             )
-            logging.info(f"sample_scale:\n{self.sample_scale}")
         else:
             logging.info("Univariate variance model has no initialized parameters.")
 
