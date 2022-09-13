@@ -37,7 +37,7 @@ the daily return has several uses:
 
 Some investors probably estimate volatility by using naive approaches
 such as by computing the variance on a trailing sample of returns.
-This is not an accurate approach.  During periods of increasing
+That is not an accurate approach.  During periods of increasing
 volatility this would underestimate the volatility since the
 volatility today can be significantly greater than the volatility of
 the past N days.  Volatility can change rapidly Likewise, during
