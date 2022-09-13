@@ -51,9 +51,10 @@ few trading days)
 
 ### Installation
 
-This package can be installed by running `pip install .` from the top level directory of
-a `git clone` checkout, or by running `pip install` and running `pip install and providing
-a URL for the github repo, e.g., 
+This package can be installed by running `pip install .` from the top
+level directory of a `git clone` checkout, or by running `pip install`
+and running `pip install and providing a URL for the github repo,
+e.g.,
 
      pip install git+https://github.com/mawicks/mvarch
 
@@ -70,11 +71,12 @@ import numpy as np
 import yfinance as yf  # type: ignore
 ```
 
-Construct a model using `model_factory()`.  Distribution may be 'studentt' or 'normal'.
-The mean mode can be 'zero', 'arma', or 'constant'.  It's difficult to estiamte
-the daily mean, which is small compared to the daily variance, so a resonable choice is
-to model the mean as 'zero'.  Constraints (in increasing order of computational complexity)
-may be 'scalar', 'diagonal', 'triangular', or 'none'
+Construct a model using `model_factory()`.  Distribution may be
+'studentt' or 'normal'.  The mean mode can be 'zero', 'arma', or
+'constant'.  It's difficult to estiamte the daily mean, which is small
+compared to the daily variance, so a resonable choice is to model the
+mean as 'zero'.  Constraints (in increasing order of computational
+complexity) may be 'scalar', 'diagonal', 'triangular', or 'none'
 
 ```python
 model = mvarch.model_factory(distribution="studentt", mean="zero", constraint="none")
@@ -95,13 +97,14 @@ fit_history = df.values
 
 ```
 
-Fit the model (This may take a while. Consider reducing the computational complexity
-by subsetting the history by, for example, 
-`fit_history = df.values[-100:]` or by reducing by modifying the `constraint`
-argument in the call to `model_factory()` to be either `scalar` or `diagonal`.)
-Note that the log-likelihood reported by the following commanbds is the *mean*
-or per-sample log-likelihood averaged over the number of observations.  It
-is not the total log-likelihood.
+Fit the model (This may take a while. Consider reducing the
+computational complexity by subsetting the history by, for example,
+`fit_history = df.values[-100:]` or by reducing by modifying the
+`constraint` argument in the call to `model_factory()` to be either
+`scalar` or `diagonal`.)  Note that the log-likelihood reported by the
+following commanbds is the *mean* or per-sample log-likelihood
+averaged over the number of observations.  It is not the total
+log-likelihood.
 
 ```pythonp
 model.fit(fit_history)
@@ -129,9 +132,10 @@ evaluate_tail = df.index[-TAIL_SIZE:]
 evaluate_history = df.loc[evaluate_tail].values
 ```
 
-Run `predict()` on the data subset to make historical predictions and also
-next-day predictions. Get correlation, std deviation, and mean estimates for
-previous days from history and also for the next business day:
+Run `predict()` on the data subset to make historical predictions and
+also next-day predictions. Get correlation, std deviation, and mean
+estimates for previous days from history and also for the next
+business day:
 
 ```python
 (
@@ -170,18 +174,20 @@ Next day correlation prediction:
 ```
 
 A sample plot of historic volatility obtained from this data follows
-(code used to construct plots shown in [example.py](/src/mvarch/example.py)):
+(code used to construct plots shown in
+[example.py](/src/mvarch/example.py)):
 
 ![Historic Volatility](images/fig1.png)
 
 Get simulated results using a Monte Carlo simulation for the next
-`SIMULATION_PERIODS` days, by sampling the model output
-for `SIMULATION_SAMPLES` times.  Note that we compute the total
-return over the simulation period by using `exp(cumsum)` which is
-different from just the sum of the log returns.
-The resulting standard deviations and correlations
-could be fed into a portfolio optimization routine that chooses an allocation among
-the symbols that minimizes the standard deviation subject to some other constraints (e.g., return).
+`SIMULATION_PERIODS` days, by sampling the model output for
+`SIMULATION_SAMPLES` times.  Note that we compute the total return
+over the simulation period by using `exp(cumsum)` which is different
+from just the sum of the log returns.  The resulting standard
+deviations and correlations could be fed into a portfolio optimization
+routine that chooses an allocation among the symbols that minimizes
+the standard deviation subject to some other constraints (e.g.,
+return).
 
 ```python
 
@@ -220,11 +226,13 @@ Correlation of total returns over simulation period (126 days):
  [ 0.69823601  0.57860402  0.02317722  1.        ]]
 ```
 
-Plots showing historic prices and *simulated* future prices obtained from this data are shown
-in the following plots (code used to construct plots is in [example.py](/src/mvarch/example.py)).
-Note that SPY and QQQ are strongly correlated 
-with one another, VNQ is somewhat correlated with SPY and QQQ,  and BND is not very correlated with the others.
-These correlations appear in the historic data as well as the simulated data.
+Plots showing historic prices and *simulated* future prices obtained
+from this data are shown in the following plots (code used to
+construct plots is in [example.py](/src/mvarch/example.py)).  Note
+that SPY and QQQ are strongly correlated with one another, VNQ is
+somewhat correlated with SPY and QQQ, and BND is not very correlated
+with the others.  These correlations appear in the historic data as
+well as the simulated data.
 
 ![Monte Carlo Simulation](images/fig2.png)
 
