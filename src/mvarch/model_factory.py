@@ -1,5 +1,7 @@
 from typing import Any, Dict, Optional
 
+import torch
+
 from . import distributions
 from . import mean_models
 from . import parameters
@@ -53,6 +55,7 @@ def model_factory(
     constraint: str = "none",
     multivariate: str = "mvarch",
     tune_all: bool = False,
+    device: Optional[torch.device] = None,
 ):
     """
     Build a multivariate or univariate model.
@@ -77,7 +80,9 @@ def model_factory(
     constraint_type = get_choice("constraint", constraint, CONSTRAINT_CHOICES)
 
     univariate_model = univariate_type(
-        distribution=distribution_type(), mean_model=mean_type()
+        distribution=distribution_type(device=device),
+        mean_model=mean_type(device=device),
+        device=device,
     )
 
     if multivariate_type is not None:
@@ -85,6 +90,7 @@ def model_factory(
             univariate_model=univariate_model,
             constraint=constraint_type,
             tune_all=tune_all,
+            device=device,
         )
     else:
         model = univariate_model
