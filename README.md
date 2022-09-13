@@ -114,7 +114,8 @@ such as
 First 'tail' the data:
 
 ```python
-evaluate_tail = df.index[-500:]
+TAIL_SIZE = 500
+evaluate_tail = df.index[-TAIL_SIZE:]
 evaluate_history = df.loc[evaluate_tail].values
 ```
 
@@ -161,7 +162,7 @@ Next day correlation prediction:
 A sample plot of historic volatility obtained from this data follows
 (code used to construct plots shown in [example.py](/src/mvarch/example.py)):
 
-![Historic Volatility](figures/fig1.png)
+![Historic Volatility](images/fig1.png)
 
 Get simulated results using a Monte Carlo simulation for the next
 `SIMULATION_PERIODS` days, by sampling the model output
@@ -215,7 +216,5 @@ Note that SPY and QQQ are strongly correlated
 with one another, VNQ is somewhat correlated with SPY and QQQ,  and BND is not very correlated with the others.
 These correlations appear in the historic data as well as the simulated data.
 
-![Monte Carlo Simulation](figures/fig2.png)
-
-
+![Monte Carlo Simulation](images/fig2.png)
 
