@@ -65,6 +65,7 @@ def run(
     use_hsmd,
     symbols,
     refresh,
+    model_file=None,
     seed=DEFAULT_SEED,
     start_date=None,
     end_date=None,
@@ -149,7 +150,8 @@ def run(
         ) = result
         mv_scale_next = mv_scale = None
 
-    torch.save(multivariate, "model.pt")
+    if model_file is not None:
+        torch.save(multivariate, model_file)
 
 
 @click.command()
@@ -166,6 +168,12 @@ def run(
     default=False,
     show_default=True,
     help="Refresh stock data",
+)
+@click.option(
+    "--model",
+    "-n",
+    type=click.File("wb"),
+    help="Output file for trained model.",
 )
 @click.option("--seed", default=DEFAULT_SEED, show_default=True, type=int)
 @click.option(
@@ -238,6 +246,7 @@ def main_cli(
     use_hsmd,
     symbol,
     refresh,
+    model,
     seed,
     start_date,
     end_date,
@@ -260,6 +269,7 @@ def main_cli(
         use_hsmd,
         symbols=symbol,
         refresh=refresh,
+        model_file=model,
         seed=seed,
         start_date=start_date,
         end_date=end_date,
