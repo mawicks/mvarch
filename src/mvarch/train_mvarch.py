@@ -7,6 +7,7 @@ from typing import Callable, Iterable, Iterator, Union, Tuple
 import click
 import pandas as pd  # type: ignore
 
+import numpy as np
 import torch
 
 
@@ -48,24 +49,37 @@ def prepare_data(
     eval_start_date: Union[dt.date, None] = None,
     eval_end_date: Union[dt.date, None] = None,
 ):
-    # Refresh historical data
-    logging.info("Reading historical data")
-
     combiner = PriceHistoryConcatenator()
 
-    symbol_list = sorted(symbol_list)
+    # Refresh historical data
+    logging.info("Reading historical data")
     full_history = combiner(history_loader(symbol_list))
     training_data = full_history.loc[
         start_date:end_date, (symbol_list, "log_return")  # type: ignore
     ]
-    return training_data
+    logging.info(
+        f"Training data ranges from {training_data.index[0].date()} to {training_data.index[-1].date()}"
+    )
+    evaluation_data = full_history.loc[
+        eval_start_date:eval_end_date, (symbol_list, "log_return")  # type: ignore
+    ]
+    return training_data, evaluation_data
+
+
+def check_for_duplicates(symbol_list):
+    d = {}
+    for s in symbol_list:
+        d[s] = d.get(s, 0) + 1
+    duplicates = [s for s in d.keys() if d[s] > 1]
+    if len(duplicates) > 0:
+        raise ValueError(f"Duplicate symbols: {duplicates}")
 
 
 def run(
     use_hsmd,
     symbols,
     refresh,
-    model_file=None,
+    output_file=None,
     seed=DEFAULT_SEED,
     start_date=None,
     end_date=None,
@@ -79,7 +93,10 @@ def run(
     device=device,
 ):
     # Rewrite symbols with deduped, uppercase versions
-    symbols = list(map(str.upper, set(symbols)))
+    symbols = list(map(str.upper, symbols))
+
+    # Check for duplicates
+    check_for_duplicates(symbols)
 
     logging.debug(f"device: {device}")
     logging.debug(f"symbols: {symbols}")
@@ -105,7 +122,7 @@ def run(
 
     torch.random.manual_seed(seed)
 
-    training_data = prepare_data(
+    training_data, evaluation_data = prepare_data(
         history_loader,
         symbols,
         start_date=start_date,
@@ -113,9 +130,12 @@ def run(
         eval_start_date=eval_start_date,
         eval_end_date=eval_end_date,
     )
+
     logging.debug(f"training_data:\n {training_data}")
-    observations = torch.tensor(training_data.values, dtype=torch.float, device=device)
-    logging.debug(f"observations:\n {observations}")
+    train_observations = torch.tensor(
+        training_data.values, dtype=torch.float, device=device
+    )
+    logging.debug(f"training observations:\n {train_observations}")
 
     model = model_factory(
         distribution=distribution,
@@ -126,54 +146,95 @@ def run(
         device=device,
     )
 
-    model.fit(observations)
-    # Compute the final loss
-    ll = model.mean_log_likelihood(observations)
-    logging.info(f"**** Final likelihood (per sample): {ll:.4f} ****")
+    model.fit(train_observations)
 
-    result = model.predict(observations)
+    # Compute the final training loss
+    train_ll = model.mean_log_likelihood(train_observations)
+    logging.info(f"**** Per sample log likelihood (train): {train_ll:.4f} ****")
+
+    if eval_start_date != start_date or eval_end_date != end_date:
+        eval_observations = torch.tensor(
+            evaluation_data.values, dtype=torch.float, device=device
+        )
+        eval_ll = model.mean_log_likelihood(eval_observations)
+        logging.info(f"**** Per sample log likelihood (eval): {eval_ll:.4f} ****")
+    else:
+        eval_ll = train_ll
+
+    result = model.predict(train_observations)
     if len(result) == 6:
         (
-            mv_scale_next,
-            uv_scale_next,
-            mean_next,
-            mv_scale,
-            uv_scale,
-            mean,
-        ) = result
+            next_mv_scale,
+            next_uv_scale,
+            next_mean,
+        ) = result[:3]
     else:
-        (
-            uv_scale_next,
-            mean_next,
-            uv_scale,
-            mean,
-        ) = result
-        mv_scale_next = mv_scale = None
+        next_uv_scale, next_mean = result[:2]
+        next_mv_scale = None
 
-    if model_file is not None:
-        torch.save(multivariate, model_file)
+    if output_file is not None:
+        output = {
+            "date": dt.datetime.today(),
+            "symbols": symbols,
+            "model": model,
+            "eval_log_likelihood": round(eval_ll, 4),
+            "first_train_date": training_data.index[0].date(),
+            "last_train_date": training_data.index[-1].date(),
+            "first_eval_date": evaluation_data.index[0].date(),
+            "last_eval_date": evaluation_data.index[-1].date(),
+            "train_log_likelihood": round(train_ll, 4),
+            "next_mv_scale": next_mv_scale,
+            "next_uv_scale": next_uv_scale,
+            "next_mean": next_mean,
+        }
+
+        torch.save(output, output_file)
+
+    if next_mv_scale is not None:
+        total_scale = next_uv_scale.unsqueeze(1) * next_mv_scale
+        # Next line computes the row norms
+        scale = torch.linalg.norm(total_scale, dim=1)
+        # Next line normalizes the rows
+        t = torch.nn.functional.normalize(total_scale, dim=1)
+        corr = t @ t.T
+    else:
+        scale = next_uv_scale
+        corr = None
+
+    volatility = np.sqrt(252.0) * scale * model.distribution.std_dev()
+    logging.info(f"Symbols: {symbols}")
+    logging.info(
+        f"Annualized volatility prediction for next period: {volatility.numpy()}"
+    )
+    if corr is not None:
+        logging.info(f"Correlation prediction for next period:\n{corr.numpy()}")
 
 
 @click.command()
+@click.option(
+    "--symbol",
+    "-s",
+    multiple=True,
+    help="Symbol(s) to include in model (may be specified multiple times)",
+)
 @click.option(
     "--use-hsmd",
     default=None,
     show_default=True,
     help="Use huge stock market dataset if specified zip file (else use yfinance)",
 )
-@click.option("--symbol", "-s", multiple=True, show_default=True)
 @click.option(
     "--refresh",
     is_flag=True,
     default=False,
     show_default=True,
-    help="Refresh stock data",
+    help="Refresh cached stock data",
 )
 @click.option(
-    "--model",
-    "-n",
+    "--output",
+    "-o",
     type=click.File("wb"),
-    help="Output file for trained model.",
+    help="Output file for trained model and metadata.",
 )
 @click.option("--seed", default=DEFAULT_SEED, show_default=True, type=int)
 @click.option(
@@ -243,10 +304,10 @@ def run(
     help="Error distribution to use.",
 )
 def main_cli(
-    use_hsmd,
     symbol,
+    use_hsmd,
     refresh,
-    model,
+    output,
     seed,
     start_date,
     end_date,
@@ -265,11 +326,15 @@ def main_cli(
     if end_date:
         end_date = end_date.date()
 
+    if univariate == "none" and multivariate == "none":
+        print("Univariate model and multivariate model cannot both be 'none'")
+        exit(1)
+
     run(
         use_hsmd,
         symbols=symbol,
         refresh=refresh,
-        model_file=model,
+        output_file=output,
         seed=seed,
         start_date=start_date,
         end_date=end_date,

@@ -231,7 +231,7 @@ class MultivariateARCHModel:
                 f"b: {self.b.value.detach().numpy()},\n"
                 f"c: {self.c.value.detach().numpy()},\n"
                 f"d: {self.d.value.detach().numpy()}, \n"
-                f"sample_scale: {self.sample_scale.numpy()}"
+                f"sample_scale:\n{self.sample_scale.numpy()}"
             )
         else:
             logging.info("Multivariate ARCH model has no initialized parameters")
