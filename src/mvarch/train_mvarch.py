@@ -58,7 +58,8 @@ def prepare_data(
         start_date:end_date, (symbol_list, "log_return")  # type: ignore
     ]
     logging.info(
-        f"Training data ranges from {training_data.index[0].date()} to {training_data.index[-1].date()}"
+        "Training data ranges from "
+        f"{training_data.index[0].date()} to {training_data.index[-1].date()}"
     )
     evaluation_data = full_history.loc[
         eval_start_date:eval_end_date, (symbol_list, "log_return")  # type: ignore
