@@ -21,8 +21,6 @@ from .stock_data import (
 
 from .model_factory import model_factory
 
-DEFAULT_SEED = 42
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s:%(message)s",
@@ -81,7 +79,6 @@ def run(
     symbols,
     refresh,
     output_file=None,
-    seed=DEFAULT_SEED,
     start_date=None,
     end_date=None,
     eval_start_date=None,
@@ -102,7 +99,6 @@ def run(
     logging.debug(f"device: {device}")
     logging.debug(f"symbols: {symbols}")
     logging.debug(f"refresh: {refresh}")
-    logging.debug(f"Seed: {seed}")
     logging.debug(f"Start date: {start_date}")
     logging.debug(f"End date: {end_date}")
     logging.debug(f"Evaluation/termination start date: {eval_start_date}")
@@ -120,8 +116,6 @@ def run(
         data_source = YFinanceSource()
 
     history_loader = CachingSymbolHistoryLoader(data_source, data_store, refresh)
-
-    torch.random.manual_seed(seed)
 
     training_data, evaluation_data = prepare_data(
         history_loader,
@@ -156,6 +150,10 @@ def run(
     if eval_start_date != start_date or eval_end_date != end_date:
         eval_observations = torch.tensor(
             evaluation_data.values, dtype=torch.float, device=device
+        )
+        logging.info(
+            "Evaluation data ranges from "
+            f"{evaluation_data.index[0].date()} to {evaluation_data.index[-1].date()}"
         )
         eval_ll = model.mean_log_likelihood(eval_observations)
         logging.info(f"**** Per sample log likelihood (eval): {eval_ll:.4f} ****")
@@ -237,7 +235,6 @@ def run(
     type=click.File("wb"),
     help="Output file for trained model and metadata.",
 )
-@click.option("--seed", default=DEFAULT_SEED, show_default=True, type=int)
 @click.option(
     "--start-date",
     default=None,
@@ -309,7 +306,6 @@ def main_cli(
     use_hsmd,
     refresh,
     output,
-    seed,
     start_date,
     end_date,
     eval_start_date,
@@ -327,6 +323,12 @@ def main_cli(
     if end_date:
         end_date = end_date.date()
 
+    if eval_start_date:
+        eval_start_date = eval_start_date.date()
+
+    if eval_end_date:
+        eval_end_date = eval_end_date.date()
+
     if univariate == "none" and multivariate == "none":
         print("Univariate model and multivariate model cannot both be 'none'")
         exit(1)
@@ -336,7 +338,6 @@ def main_cli(
         symbols=symbol,
         refresh=refresh,
         output_file=output,
-        seed=seed,
         start_date=start_date,
         end_date=end_date,
         eval_start_date=eval_start_date,

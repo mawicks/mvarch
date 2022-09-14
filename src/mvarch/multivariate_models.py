@@ -62,6 +62,11 @@ def joint_conditional_log_likelihood(
 
     log_diag = torch.log(torch.abs(torch.diagonal(mv_scale, dim1=1, dim2=2)))
 
+    # There should be no "zero" diagonal entries unless two variables are perfectly correlatd.
+    # However during optimization this can happen so we clamp the log of the diagonals
+    # at a small fixed number.
+    log_diag = torch.clamp(log_diag, min=constants.LOG_MIN_SCALE_DIAGONAL)
+
     if uv_scale is not None:
         log_diag = log_diag + torch.log(torch.abs(uv_scale))
         centered_observations = centered_observations / uv_scale
