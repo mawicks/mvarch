@@ -205,10 +205,10 @@ def run(
     volatility = np.sqrt(252.0) * scale * model.distribution.std_dev()
     logging.info(f"Symbols: {symbols}")
     logging.info(
-        f"Annualized volatility prediction for next period: {volatility.numpy()}"
+        f"Annualized volatility prediction for next time period: {volatility.numpy()}"
     )
     if corr is not None:
-        logging.info(f"Correlation prediction for next period:\n{corr.numpy()}")
+        logging.info(f"Correlation prediction for next time period:\n{corr.numpy()}")
 
 
 @click.command()
