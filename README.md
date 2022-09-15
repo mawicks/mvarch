@@ -47,9 +47,11 @@ the volatility.  By using ARMA approaches, you can determine the
 distribution of daily returns during the next trading day (or the next
 few trading days)
 
-`MVARCH` is a Python package.  You can train a model either by constructing a bit
-of Pythohn code, or by training a model using a command-line tool included in
-the package.  Making effective use of the model likely requires writing some Python code.
+`MVARCH` is a Python package.  You can train a model either by constructing
+[a bit of Python code](#training-a-model-in-python),
+or by training a model [using a command-line tool](#training-a-model-using-the-command-line-tool)
+included in the package.
+Making effective use of the model likely requires [writing some Python code](#using-the-model).
 
 ## Usage
 
