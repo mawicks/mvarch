@@ -22,5 +22,8 @@ INITIAL_DECAY = 0.10
 MAX_CLAMP = 1e10
 MIN_CLAMP = -MAX_CLAMP
 
-# Relative EPS (should be slightly above the machien epsilon)
+# Relative EPS (should be slightly above the machine epsilon)
 EPS = 1e-6
+
+# Assumed log of minimum diagonal of scale matrix under any circumstances
+LOG_MIN_SCALE_DIAGONAL = -20.0

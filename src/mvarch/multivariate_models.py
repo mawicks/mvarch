@@ -62,6 +62,11 @@ def joint_conditional_log_likelihood(
 
     log_diag = torch.log(torch.abs(torch.diagonal(mv_scale, dim1=1, dim2=2)))
 
+    # There should be no "zero" diagonal entries unless two variables are perfectly correlatd.
+    # However during optimization this can happen so we clamp the log of the diagonals
+    # at a small fixed number.
+    log_diag = torch.clamp(log_diag, min=constants.LOG_MIN_SCALE_DIAGONAL)
+
     if uv_scale is not None:
         log_diag = log_diag + torch.log(torch.abs(uv_scale))
         centered_observations = centered_observations / uv_scale
@@ -226,12 +231,12 @@ class MultivariateARCHModel:
     def log_parameters(self) -> None:
         if self.a and self.b and self.c and self.d:
             logging.info(
-                "Multivariate ARCH model\n"
+                f"Multivariate ARCH model parameters:\n"
                 f"a: {self.a.value.detach().numpy()},\n"
                 f"b: {self.b.value.detach().numpy()},\n"
                 f"c: {self.c.value.detach().numpy()},\n"
                 f"d: {self.d.value.detach().numpy()}, \n"
-                f"sample_scale: {self.sample_scale.numpy()}"
+                f"sample_scale:\n{self.sample_scale.numpy()}"
             )
         else:
             logging.info("Multivariate ARCH model has no initialized parameters")
@@ -410,7 +415,6 @@ class MultivariateARCHModel:
 
         if self.univariate_model.is_optimizable:
             self.univariate_model.fit(observations)
-            self.univariate_model.log_parameters()
             uv_scale, uv_mean = self.univariate_model.predict(observations)[2:]
             centered_observations = observations - uv_mean
             self.initialize_parameters(centered_observations / uv_scale)
@@ -422,8 +426,6 @@ class MultivariateARCHModel:
             self.univariate_model.initialize_parameters(observations)
             self.initialize_parameters(observations)
             centered_observations = uv_scale = uv_mean = None
-
-        self.log_parameters()
 
         # We always optimize the multivariate model parameters here.
         parameters = self.get_optimizable_parameters()

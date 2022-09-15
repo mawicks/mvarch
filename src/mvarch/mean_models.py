@@ -60,8 +60,8 @@ class MeanModel(Protocol):
             mean_initial_value: torch.Tensor (or something convertible to one)
                           Initial mean vector if specified
         Returns:
-            mu_next: torch.Tensor prediction for next unobserved value
-            mu: torch.Tensor of predictions for each observation
+            mu_next: torch.Tensor - prediction for next unobserved value
+            mu: torch.Tensor - predictions for each observation
 
         """
 
@@ -134,8 +134,8 @@ class ZeroMeanModel(MeanModel):
             mean_initial_value: torch.Tensor (or something convertible to one)
                                 Ignored for ZeroMeanModel
         Returns:
-            mu: torch.Tensor of predictions for each observation
-            mu_next: torch.Tensor prediction for next unobserved value
+            mu_next: torch.Tensor - mean prediction for next unobserved value
+            mu: torch.Tensor - mean predictions for each observation
 
         """
         mu = torch.zeros(observations.shape, dtype=torch.float, device=self.device)
@@ -184,7 +184,7 @@ class ConstantMeanModel(MeanModel):
         return [self.mu]
 
     def log_parameters(self) -> None:
-        logging.info(f"Constant Mean Model: {self.mu}")
+        logging.info(f"Constant mean model parameters: {self.mu}")
 
     def _predict(
         self,
@@ -192,8 +192,8 @@ class ConstantMeanModel(MeanModel):
         sample: bool = False,
         mean_initial_value: Union[torch.Tensor, None] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Given a, b, c, d, and observations, generate the *estimated*
-        standard deviations (marginal) for each observation
+        """Given observations, predict the *estimated*
+        mean for each observation
 
         Argument:
             observations: torch.Tensor of dimension (n_obs, n_symbols)
@@ -204,15 +204,14 @@ class ConstantMeanModel(MeanModel):
             mean_initial_value: torch.Tensor (or something convertible to one)
                                 Ignored for ConstantMeanModel
         Returns:
-            mu: torch.Tensor of predictions for each observation
-            mu_next: torch.Tensor prediction for next unobserved value
+            mu_next: torch.Tensor - mean prediction for next unobserved value
+            mu: torch.Tensor - mean predictions for each observation
 
         """
         if self.mu is None:
             raise RuntimeError("Constant mean model has not been initialized)")
 
-        print(self.mu)
-        mu = self.mu.unsqueeze(0).expand(observations.shape)
+        mu = torch.clone(self.mu).unsqueeze(0).expand(observations.shape)
         mu_next = self.mu
         return mu_next, mu
 
@@ -255,25 +254,15 @@ class ARMAMeanModel(MeanModel):
         sample_mean = kwargs["sample_mean"]
 
         if not isinstance(a, torch.Tensor):
-            a = torch.tensor(
-                a, dtype=torch.float, device=self.device, requires_grad=True
-            )
+            a = to_tensor(a, device=self.device, requires_grad=True)
         if not isinstance(b, torch.Tensor):
-            b = torch.tensor(
-                b, dtype=torch.float, device=self.device, requires_grad=True
-            )
+            b = to_tensor(b, device=self.device, requires_grad=True)
         if not isinstance(c, torch.Tensor):
-            c = torch.tensor(
-                c, dtype=torch.float, device=self.device, requires_grad=True
-            )
+            c = to_tensor(c, device=self.device, requires_grad=True)
         if not isinstance(d, torch.Tensor):
-            d = torch.tensor(
-                d, dtype=torch.float, device=self.device, requires_grad=True
-            )
+            d = to_tensor(d, device=self.device, requires_grad=True)
         if not isinstance(sample_mean, torch.Tensor):
-            sample_mean = torch.tensor(
-                sample_mean, dtype=torch.float, device=self.device
-            )
+            sample_mean = to_tensor(sample_mean, device=self.device)
 
         if (
             len(a.shape) != 1
@@ -323,7 +312,7 @@ class ARMAMeanModel(MeanModel):
     def log_parameters(self):
         if self.a and self.b and self.c and self.d:
             logging.info(
-                "ARMA mean model\n"
+                "ARMA mean model parameters:\n"
                 f"a: {self.a.value.detach().numpy()}, "
                 f"b: {self.b.value.detach().numpy()}, "
                 f"c: {self.c.value.detach().numpy()}, "
@@ -351,8 +340,8 @@ class ARMAMeanModel(MeanModel):
             initial_mean: torch.Tensor (or something convertible to one)
                           Initial mean vector if specified
         Returns:
-            mu: torch.Tensor of predictions for each observation
-            mu_next: torch.Tensor prediction for next unobserved value
+            mu_next: torch.Tensor - mean prediction for next unobserved value
+            mu: torch.Tensor - mean predictions for each observation
 
         """
         if self.a is None or self.b is None or self.c is None or self.d is None:

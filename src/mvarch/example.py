@@ -24,7 +24,8 @@ model.fit(fit_history)
 print(f"Likelihood: {model.mean_log_likelihood(fit_history):.4f}")
 
 # Truncaate the data for summary purposes:
-evaluate_tail = df.index[-500:]
+TAIL_SIZE = 500
+evaluate_tail = df.index[-TAIL_SIZE:]
 evaluate_history = df.loc[evaluate_tail].values
 
 # Use cases:
@@ -83,20 +84,19 @@ fig1, ax1 = plt.subplots(2, 2)
 fig1.set_figwidth(16)
 fig1.set_figheight(5)
 for i, symbol in enumerate(symbols):
-    ax1[i // 2, i % 2].set_title(
-        f"{symbol} - Annualized Daily Return and Annualized Volatilty"
-    )
-    ax1[i // 2, i % 2].plot(
+    ax = ax1[i // 2, i % 2]
+    ax.set_title(f"{symbol} - Annualized Daily Return and Annualized Volatilty")
+    ax.plot(
         evaluate_tail,
         np.sqrt(252) * evaluate_history[:, i],
         label="Annualized Daily Return",
     )
-    ax1[i // 2, i % 2].plot(
+    ax.plot(
         evaluate_tail,
         np.sqrt(252) * model.distribution.std_dev() * uv_scale_history[:, i],
         label="Annualized Volatility Estimate",
     )
-    ax1[i // 2, i % 2].legend()
+    ax.legend()
 fig1.tight_layout(pad=0.4, w_pad=2.0, h_pad=2.0)
 fig1.savefig("fig1.png")
 fig1.show()
@@ -109,25 +109,29 @@ fig2, ax2 = plt.subplots(2, 2)
 fig2.set_figwidth(16)
 fig2.set_figheight(5)
 for i, symbol in enumerate(symbols):
-    ax2[i // 2, i % 2].set_title(
-        f"{symbol} - Adj Close (Past Actual Values and Future Sampled Values)"
+    ax = ax2[i // 2, i % 2]
+    ax.set_title(
+        f"{symbol} - Adj Close  for past {TAIL_SIZE} days and future {SIMULATION_PERIODS} days"
     )
-    ax2[i // 2, i % 2].plot(
+    ax.set_xlabel(
+        f"Days - values before {TAIL_SIZE} are history; values after are simulated"
+    )
+    ax.plot(
         range(len(evaluate_tail)),
         data.loc[evaluate_tail, ("Adj Close", symbol)],
         label=f"{symbol} history",
     )
-    ax2[i // 2, i % 2].plot(
+    ax.plot(
         range(len(evaluate_tail), len(evaluate_tail) + SIMULATION_PERIODS),
         simulated_adj_close[0, :, i],
         label=f"{symbol} sample",
     )
-    ax2[i // 2, i % 2].plot(
+    ax.plot(
         (len(evaluate_tail) - 0.5) * np.array([1, 1]),
         ax2[i // 2, i % 2].get_ylim(),
         "k-.",
     )
-    ax2[i // 2, i % 2].legend()
+    ax.legend()
 fig2.tight_layout(pad=0.4, w_pad=2.0, h_pad=2.0)
 fig2.savefig("fig2.png")
 fig2.show()
