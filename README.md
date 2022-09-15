@@ -50,8 +50,13 @@ few trading days)
 `MVARCH` is a Python package.  You can train a model either by constructing
 [a bit of Python code](#training-a-model-in-python),
 or by training a model [using a command-line tool](#training-a-model-using-the-command-line-tool)
-included in the package.
-Making effective use of the model likely requires [writing some Python code](#using-the-model).
+included in the package.  Making effective use of the model likely
+requires [writing some Python code](#using-the-model).
+
+`MVARCH` is implemented in PyTorch, but this is mostly hidden
+from the user.  Return values from `MVARCH` methods are PyTorch
+tensors that can be converted to `numpy` arrays by calling their
+`numpy()` methods.  A user need not know anything about PyTorch.
 
 ## Usage
 
@@ -141,9 +146,12 @@ evaluate_history = df.loc[evaluate_tail].values
 ```
 
 Run `predict()` on the data subset to make historical predictions and
-also next-day predictions. Get correlation, std deviation, and mean
-estimates for previous days from history and also for the next
-business day:
+also next-day predictions. Note that the return values from `predict()`
+and other MVARCH functions are PyTorch tensors.  If you prefer working
+with `numpy` arrays, you can call a tensor's `numpy()` method to get
+a `numpy` array.  Get correlation, std deviation, and mean
+estimates for previous days and also for the next
+business day as follows:
 
 ```python
 (
