@@ -1,3 +1,14 @@
+"""data_sources.py
+
+There are two:  YFinanceSource() or HugeStockMarketDatasetSource().
+
+HugeStockMarketDatasetSource() is a stock dataset available on Kaggle
+with no usage restrictions.  It requires downloading a large zip file
+and placing it in the current directory.
+
+"""
+
+
 import logging
 
 from typing import Callable, Dict, Iterable, Union
@@ -16,7 +27,7 @@ logging.basicConfig(level=logging.INFO)
 DataSource = Callable[[Union[str, Iterable[str]]], Dict[str, pd.DataFrame]]
 
 
-def YFinanceSource() -> DataSource:
+def YFinanceSource() -> DataSource:  # pragma: no cover
     """
     Sample usage:
     >>> from deep_volatility_models import data_sources
@@ -54,8 +65,9 @@ def YFinanceSource() -> DataSource:
         response = {}
 
         for symbol in symbols:
-            # The `group_by` option for yf.download() behaves differently when there's only one symbol.
-            # Always return a dictionary of dataframes, even for one symbol.
+            # The `group_by` option for yf.download() behaves
+            # differently when there's only one symbol.  Always return
+            # a dictionary of dataframes, even for one symbol.
             if len(symbols) > 1:
                 symbol_df = df[symbol]
             else:
@@ -70,7 +82,7 @@ def YFinanceSource() -> DataSource:
     return price_history
 
 
-def HugeStockMarketDatasetSource(zip_filename) -> DataSource:
+def HugeStockMarketDatasetSource(zip_filename) -> DataSource:  # pragma: no cover
     """
     Sample usage
     >>> from deep_volatility_models import data_sources

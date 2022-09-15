@@ -53,5 +53,11 @@ jobs:
         run: |
           source .venv/bin/activate
           mypy src/mvarch
-          pytest tests
-
+          coverage run -m pytest tests
+      #----------------------------------------------
+      #              run test suite
+      #----------------------------------------------
+      - name: Coverage report
+        run: |
+          source .venv/bin/activate
+          coverage report -m

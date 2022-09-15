@@ -1,7 +1,7 @@
 # Standard Python
 from abc import abstractmethod
 import logging
-from typing import Any, Dict, List, Protocol, Union
+from typing import Any, Dict, List, Protocol
 
 
 # Common packages
@@ -13,23 +13,27 @@ class Distribution(Protocol):
 
     @abstractmethod
     def set_parameters(self, **kwargs: Any) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_parameters(self) -> Dict[str, Any]:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
+
+    @abstractmethod
+    def std_dev(self) -> float:
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def log_parameters(self) -> None:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     @abstractmethod
     def get_instance(self) -> torch.distributions.Distribution:
-        raise NotImplementedError
+        """Abstract method with no implementation."""
 
     def set_device(self, device) -> None:
         self.device = device
@@ -48,6 +52,9 @@ class NormalDistribution(Distribution):
 
     def get_parameters(self) -> Dict[str, Any]:
         return {}
+
+    def std_dev(self) -> float:
+        return 1.0
 
     def log_parameters(self) -> None:
         return
@@ -77,19 +84,24 @@ class StudentTDistribution(Distribution):
     def get_parameters(self) -> Dict[str, Any]:
         return {"df": self.df}
 
+    def std_dev(self) -> float:
+        if torch.abs(self.df) > 2:
+            return float(torch.abs(self.df) / torch.abs(self.df - 2))
+        elif self.df > 1:
+            return float("inf")
+        else:
+            return float("nan")
+
     def log_parameters(self) -> None:
         logging.info(f"StudentT DF: {self.df:.3f}")
 
     def get_optimizable_parameters(self) -> List[torch.Tensor]:
-        print("df: ", self.df)
-
         return [self.df]
 
     def get_instance(self) -> torch.distributions.Distribution:
-        return torch.distributions.studentT.StudentT(self.df)
+        return torch.distributions.studentT.StudentT(torch.abs(self.df))
 
 
-if __name__ == "__main__":
-
+if __name__ == "__main__":  # pragma: no cover
     n = NormalDistribution()
     t = StudentTDistribution()
