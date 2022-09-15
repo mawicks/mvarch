@@ -1,9 +1,9 @@
 [![test](https://github.com/mawicks/mvarch/actions/workflows/pythonapp.yml/badge.svg)](https://github.com/mawicks/mvarch/actions/workflows/pythonapp.yml)
 
-# Multivariate Volatility Models (ARCH) for stock prices and other time series)
+# Multivariate Volatility Models (MVARCH) for stock prices and other time series)
 
 This package uses a simple model for multivariate (and univariate)
-volatility (ARCH) models
+volatility models similar in principle to univariate (G)ARCH models.
 
 ## Motivation
 
@@ -47,18 +47,25 @@ the volatility.  By using ARMA approaches, you can determine the
 distribution of daily returns during the next trading day (or the next
 few trading days)
 
+`MVARCH` is a Python package.  You can train a model either by constructing a bit
+of Pythohn code, or by training a model using a command-line tool included in
+the package.  Making effective use of the model likely requires writing some Python code.
+
 ## Usage
 
 ### Installation
 
-This package can be installed by running `pip install .` from the top
-level directory of a `git clone` checkout, or by running `pip install`
-and running `pip install and providing a URL for the github repo,
+`MVARCH` is a Python package which can be installed either by running
+`pip install .` from the top
+level directory of a `git clone` checkout, or by
+running `pip install and providing a URL for the github repo,
 e.g.,
 
-     pip install git+https://github.com/mawicks/mvarch
+```console
+pip install git+https://github.com/mawicks/mvarch
+```
 
-### Training a model
+### Training a Model in Python
 
 We will train a model on historic data for a small set of stock symbols.
 
@@ -94,7 +101,6 @@ data = yf.download(symbols)
 # log1p on the whole thing produces the log returns.
 df = np.log1p(data.loc[:, ("Adj Close", symbols)].dropna().pct_change().dropna())
 fit_history = df.values
-
 ```
 
 Fit the model (This may take a while. Consider reducing the
@@ -117,7 +123,7 @@ If you ran this code on 2022-09-12, you might see something like:
 Likelihood: 15.2868
 ```
 
-### Using the model
+### Using the Model
 
 Run the model on a subset ('tail') of the data for a couple of different use cases
 such as
@@ -162,7 +168,8 @@ print(
 ```
 
 If you ran this code on 2022-09-12, you might see something like:
-```
+
+```console
 Next day volatility prediction (annualized):
 [0.24272123 0.30139446 0.08419606 0.2395135 ]
 
@@ -215,7 +222,7 @@ print(
 
 If you ran this code on 2022-09-12, you might see something like:
 
-```
+```console
 Std dev of total returns over simulation period (126 days):
 [0.15605381 0.18821143 0.03908034 0.18603522]
 
@@ -235,4 +242,43 @@ with the others.  These correlations appear in the historic data as
 well as the simulated data.
 
 ![Monte Carlo Simulation](images/fig2.png)
+
+### Training a Model Using the Command-Line Tool
+
+Instead of writing code as above, you can train models with a command-line tool.  The tool wil train a model
+and write the model to a file along with some meta data.  You would still need to write some code to load and use the
+model to evaluate it on new data or to generate simulated output.  The command-line tool downloads stock price
+history as necessary and caches it in a subdirectory named `training_data` that it creates in the current directory.
+This eliminates unnecessary calls to `yfinance`.
+
+For example, the model shown above could be trained using the following command:
+
+```console
+python -m mvarch.train --distribution studentt --mean zero --univariate arch --multivariate mvarch --constraint none --output output.pt \
+                       -s SPY -s QQQ -s BND -s VNQ
+```
+
+By default, the tool trains the model on all available history.  You
+can also provide start and end dates to define a specific period for
+the training data.  You can separately specify start and end dates for
+a different time period on which to evaluate the model.  The
+command-line tool will show the mean log-likelihood achieved on both
+time periods.
+
+For example, the following command trains a model on the same stock symbols over a ten year period
+and evaluates the trained model on the next 18 months of data:
+
+```console
+python -m mvarch.train --distribution studentt --mean zero --univariate arch --multivariate mvarch --constraint none --output output.pt \
+                       -s SPY -s QQQ -s BND -s VNQ \
+		       --start-date 2011-01-01 --end-date 2020-12-31 --eval-start-date 2021-01-01 --eval-end-date 2022-06-30
+```
+
+Without adequate parameter constraints, these models have a large
+number of parameters and can be prone to overfitting.  It's important
+to select parameter constraints that produce a model that performs well
+on an evaluation period not included in the training data.  Adding constraints
+is a form of regularization which enhances generalization.  Choosing either `diagonal`
+or even `scalar` constraints on the multivariate model might be a good choice.
+
 
