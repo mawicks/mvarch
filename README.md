@@ -147,7 +147,7 @@ evaluate_history = df.loc[evaluate_tail].values
 
 Run `predict()` on the data subset to make historical predictions and
 also next-day predictions. Note that the return values from `predict()`
-and other MVARCH functions are PyTorch tensors.  If you prefer working
+and other `MVARCH` functions are PyTorch tensors.  If you prefer working
 with `numpy` arrays, you can call a tensor's `numpy()` method to get
 a `numpy` array.  Get correlation, std deviation, and mean
 *estimates* for the past and *predictions* for the next business day
