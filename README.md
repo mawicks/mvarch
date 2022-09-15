@@ -256,7 +256,12 @@ This eliminates unnecessary calls to `yfinance`.
 For example, the model shown above could be trained using the following command:
 
 ```console
-python -m mvarch.train --distribution studentt --mean zero --univariate arch --multivariate mvarch --constraint none --output output.pt \
+python -m mvarch.train --distribution studentt \
+                       --mean zero \
+		       --univariate arch \
+		       --multivariate mvarch \
+		       --constraint none\
+		       --output output.pt \
                        -s SPY -s QQQ -s BND -s VNQ
 ```
 
@@ -271,9 +276,15 @@ For example, the following command trains a model on the same stock symbols over
 and evaluates the trained model on the next 18 months of data:
 
 ```console
-python -m mvarch.train --distribution studentt --mean zero --univariate arch --multivariate mvarch --constraint none --output output.pt \
+python -m mvarch.train --distribution studentt \
+                       --mean zero \
+		       --univariate arch \
+		       --multivariate mvarch \
+		       --constraint none \
+		       --output output.pt \
                        -s SPY -s QQQ -s BND -s VNQ \
-		       --start-date 2011-01-01 --end-date 2020-12-31 --eval-start-date 2021-01-01 --eval-end-date 2022-06-30
+		       --start-date 2011-01-01 --end-date 2020-12-31 \
+		       --eval-start-date 2021-01-01 --eval-end-date 2022-06-30
 ```
 
 Without adequate parameter constraints, these models have a large
