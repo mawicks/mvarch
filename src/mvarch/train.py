@@ -291,7 +291,7 @@ def run(
     type=click.Choice(
         ["scalar", "diagonal", "triangular", "none"], case_sensitive=False
     ),
-    default="none",
+    default="diagonal",
     help="Type of constraint to be applied to multivariate parameters.",
 )
 @click.option(
