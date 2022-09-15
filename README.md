@@ -150,8 +150,8 @@ also next-day predictions. Note that the return values from `predict()`
 and other MVARCH functions are PyTorch tensors.  If you prefer working
 with `numpy` arrays, you can call a tensor's `numpy()` method to get
 a `numpy` array.  Get correlation, std deviation, and mean
-estimates for previous days and also for the next
-business day as follows:
+*estimates* for the past and *predictions* for the next business day
+as follows:
 
 ```python
 (
@@ -196,15 +196,17 @@ A sample plot of historic volatility obtained from this data follows
 
 ![Historic Volatility](images/fig1.png)
 
-Get simulated results using a Monte Carlo simulation for the next
+Next, get simulated results using a Monte Carlo simulation for the next
 `SIMULATION_PERIODS` days, by sampling the model output for
-`SIMULATION_SAMPLES` times.  Note that we compute the total return
+`SIMULATION_SAMPLES` different outcomes.  Note that we compute the total return
 over the simulation period by using `exp(cumsum)` which is different
 from just the sum of the log returns.  The resulting standard
 deviations and correlations could be fed into a portfolio optimization
 routine that chooses an allocation among the symbols that minimizes
 the standard deviation subject to some other constraints (e.g.,
-return).
+return).  Again, note that the return values from `simulate()` are
+PyTorch tensors, which can be converted to `numpy` arrays by calling
+their `numpy()` method:
 
 ```python
 
