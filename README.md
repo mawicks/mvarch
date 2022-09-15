@@ -50,8 +50,13 @@ few trading days)
 `MVARCH` is a Python package.  You can train a model either by constructing
 [a bit of Python code](#training-a-model-in-python),
 or by training a model [using a command-line tool](#training-a-model-using-the-command-line-tool)
-included in the package.
-Making effective use of the model likely requires [writing some Python code](#using-the-model).
+included in the package.  Making effective use of the model likely
+requires [writing some Python code](#using-the-model).
+
+`MVARCH` is implemented in PyTorch, but this is mostly hidden
+from the user.  Return values from `MVARCH` methods are PyTorch
+tensors that can be converted to `numpy` arrays by calling their
+`numpy()` methods.  A user need not know anything about PyTorch.
 
 ## Usage
 
@@ -141,9 +146,12 @@ evaluate_history = df.loc[evaluate_tail].values
 ```
 
 Run `predict()` on the data subset to make historical predictions and
-also next-day predictions. Get correlation, std deviation, and mean
-estimates for previous days from history and also for the next
-business day:
+also next-day predictions. Note that the return values from `predict()`
+and other `MVARCH` functions are PyTorch tensors.  If you prefer working
+with `numpy` arrays, you can call a tensor's `numpy()` method to get
+a `numpy` array.  Get correlation, std deviation, and mean
+*estimates* for the past and *predictions* for the next business day
+as follows:
 
 ```python
 (
@@ -188,15 +196,17 @@ A sample plot of historic volatility obtained from this data follows
 
 ![Historic Volatility](images/fig1.png)
 
-Get simulated results using a Monte Carlo simulation for the next
+Next, get simulated results using a Monte Carlo simulation for the next
 `SIMULATION_PERIODS` days, by sampling the model output for
-`SIMULATION_SAMPLES` times.  Note that we compute the total return
+`SIMULATION_SAMPLES` different outcomes.  Note that we compute the total return
 over the simulation period by using `exp(cumsum)` which is different
 from just the sum of the log returns.  The resulting standard
 deviations and correlations could be fed into a portfolio optimization
 routine that chooses an allocation among the symbols that minimizes
 the standard deviation subject to some other constraints (e.g.,
-return).
+return).  Again, note that the return values from `simulate()` are
+PyTorch tensors, which can be converted to `numpy` arrays by calling
+their `numpy()` method:
 
 ```python
 
@@ -256,7 +266,12 @@ This eliminates unnecessary calls to `yfinance`.
 For example, the model shown above could be trained using the following command:
 
 ```console
-python -m mvarch.train --distribution studentt --mean zero --univariate arch --multivariate mvarch --constraint none --output output.pt \
+python -m mvarch.train --distribution studentt \
+                       --mean zero \
+		       --univariate arch \
+		       --multivariate mvarch \
+		       --constraint none\
+		       --output output.pt \
                        -s SPY -s QQQ -s BND -s VNQ
 ```
 
@@ -271,9 +286,15 @@ For example, the following command trains a model on the same stock symbols over
 and evaluates the trained model on the next 18 months of data:
 
 ```console
-python -m mvarch.train --distribution studentt --mean zero --univariate arch --multivariate mvarch --constraint none --output output.pt \
+python -m mvarch.train --distribution studentt \
+                       --mean zero \
+		       --univariate arch \
+		       --multivariate mvarch \
+		       --constraint none \
+		       --output output.pt \
                        -s SPY -s QQQ -s BND -s VNQ \
-		       --start-date 2011-01-01 --end-date 2020-12-31 --eval-start-date 2021-01-01 --eval-end-date 2022-06-30
+		       --start-date 2011-01-01 --end-date 2020-12-31 \
+		       --eval-start-date 2021-01-01 --eval-end-date 2022-06-30
 ```
 
 Without adequate parameter constraints, these models have a large
