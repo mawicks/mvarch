@@ -97,7 +97,9 @@ def test_normal_std_dev(normal_distribution):
 
 def test_studentt_std_dev(studentt_distribution):
     studentt_distribution.set_parameters(df=3.0)
-    assert studentt_distribution.std_dev() == 3.0
+    assert studentt_distribution.std_dev() == float(
+        torch.sqrt(torch.tensor(3.0, dtype=torch.float))
+    )
 
     studentt_distribution.set_parameters(df=2.0)
     assert studentt_distribution.std_dev() == float("inf")
