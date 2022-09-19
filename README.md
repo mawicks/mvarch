@@ -124,10 +124,10 @@ model.fit(fit_history)
 print(f"Likelihood: {model.mean_log_likelihood(fit_history):.4f}")
 ```
 
-If you ran this code on 2022-09-12, you might see something like:
+If you ran this code on 2022-09-19, you might see something like:
 
-```
-Likelihood: 15.2868
+```console
+Likelihood: 15.2849
 ```
 
 ### Using the Model
@@ -177,17 +177,17 @@ print(
 
 ```
 
-If you ran this code on 2022-09-12, you might see something like:
+If you ran this code on 2022-09-19, you might see something like:
 
 ```console
 Next day volatility prediction (annualized):
-[0.24272123 0.30139446 0.08419606 0.2395135 ]
+[0.27073285 0.33625355 0.05883523 0.25986665]
 
 Next day correlation prediction:
-[[1.         0.9603142  0.12006433 0.7841618 ]
- [0.9603142  1.         0.14455643 0.7046279 ]
- [0.12006433 0.14455643 1.         0.22765702]
- [0.7841618  0.7046279  0.22765702 0.9999998 ]]
+[[1.         0.9702157  0.10875233 0.8384389 ]
+ [0.9702157  1.         0.12562908 0.77586114]
+ [0.10875233 0.12562908 1.         0.22840934]
+ [0.8384389  0.77586114 0.22840934 0.9999999 ]]
 ```
 
 A sample plot of historic volatility obtained from this data follows
@@ -232,17 +232,17 @@ print(
 
 ```
 
-If you ran this code on 2022-09-12, you might see something like:
+If you ran this code on 2022-09-19, you might see something like:
 
 ```console
 Std dev of total returns over simulation period (126 days):
-[0.15605381 0.18821143 0.03908034 0.18603522]
+[0.19662732 0.2331021  0.03502716 0.22605737]
 
 Correlation of total returns over simulation period (126 days):
-[[ 1.          0.91632208 -0.08541442  0.69823601]
- [ 0.91632208  1.         -0.03951417  0.57860402]
- [-0.08541442 -0.03951417  1.          0.02317722]
- [ 0.69823601  0.57860402  0.02317722  1.        ]]
+[[ 1.          0.86296704 -0.08967935  0.70158927]
+ [ 0.86296704  1.         -0.07110933  0.54363716]
+ [-0.08967935 -0.07110933  1.          0.02450721]
+ [ 0.70158927  0.54363716  0.02450721  1.        ]]
 ```
 
 Plots showing historic prices and *simulated* future prices obtained
