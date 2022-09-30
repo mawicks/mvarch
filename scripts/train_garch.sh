@@ -18,7 +18,8 @@ mkdir -p models/
 
 for symbol in $SYMBOLS
 do
+    # symbol=`echo $symbol | tr '[:lower:]' '[:upper:]'`
     echo "Training model for $symbol"
-    python -m mvarch.train  $args $* -s $symbol -o models/${symbol}.pkl
+    python -m mvarch.train  $args $* -s $symbol -o models/${symbol}.pt
 done
 

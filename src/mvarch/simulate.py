@@ -8,6 +8,7 @@ import click
 import pandas as pd  # type: ignore
 
 import numpy as np
+import pickle
 import torch
 
 REFRESH = False
@@ -24,7 +25,7 @@ from .stock_data import (
 from .model_factory import model_factory
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s %(levelname)s:%(message)s",
     force=True,
 )
@@ -78,6 +79,7 @@ def run(
     use_hsmd=None,
     start_date=None,
     end_date=None,
+    output_file=None,
     device=device,
     pad=True,
 ):
@@ -131,9 +133,23 @@ def run(
 
     total_returns = torch.exp(torch.cumsum(log_returns, dim=1))
 
-    print(f"Log returns shape: {log_returns.shape}")
-    print(f"log returns: \n{log_returns}")
-    print(f"total returns: \n{total_returns}")
+    logging.debug(f"Log returns shape: {log_returns.shape}")
+    logging.debug(f"log returns: \n{log_returns}")
+    logging.debug(f"total returns: \n{total_returns}")
+
+    if output_file:
+        # For compatibility with another tool, the simulation must be dimmensioned
+        # as (batch_size, symbols, periods, simulations) - batch should be 1.
+        # But the above code leaves it in exactly reversed order (simulations, periods, symbols)
+        # Add a batch dimension:
+        total_returns = total_returns.unsqueeze(3)
+
+        result = {
+            "date": dt.datetime.today(),
+            "return_simulations": torch.permute(total_returns, (3, 2, 1, 0)),
+        }
+
+        pickle.dump(result, output_file)
 
 
 @click.command()
@@ -173,6 +189,11 @@ def run(
     type=click.DateTime(formats=["%Y-%m-%d"]),
     help="Final date of data used for state",
 )
+@click.option(
+    "--output_file",
+    type=click.File("wb"),
+    help="Output file for simulation results (pickle file)",
+)
 @click.argument(
     "model_file",
     type=click.File("rb"),
@@ -183,6 +204,7 @@ def main_cli(
     samples,
     start_date,
     end_date,
+    output_file,
     model_file,
 ):
 
@@ -199,6 +221,7 @@ def main_cli(
         use_hsmd=use_hsmd,
         start_date=start_date,
         end_date=end_date,
+        output_file=output_file,
         device=device,
     )
 
