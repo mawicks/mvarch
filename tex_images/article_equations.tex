@@ -1,7 +1,11 @@
 \documentclass[12pt,convert={true,density=1200}]{standalone}
+\setlength{\textwidth}{3.5in}
 \newenvironment{equationpage}[1]{\toks0{#1}\hbox to \hsize \bgroup\hfill\(}{\)\hfill{\the\toks0}\egroup}
-\standaloneconfig{multi=true,border={0pt 12pt 0pt 12pt}}
+% \newenvironment{equationpage}[1]{\toks0{#1}\hbox to \hsize \bgroup\hfill}{\egroup\hfill{}\egroup}
+% \standaloneconfig{multi=true,border={0pt 12pt 0pt 12pt}}
+\standaloneconfig{multi=true,border={0pt 0pt 0pt 0pt}}
 \standaloneenv{equationpage}
+
 
 % Following packages setup a "Charter" math environment.
 \usepackage[scaled=.98,sups]{XCharter}% lining figures in math, osf in text
@@ -9,13 +13,16 @@
 \usepackage[type1]{cabin}% sans serif
 \usepackage[uprightscript,charter,vvarbb,scaled=1.05]{newtxmath}
 \linespread{1.04}
+\usepackage{mathtools}
 
+\def\boldmu{\mathrlap{\mu}\kern0.4pt\mu}
+\def\boldepsilon{\mathrlap{\varepsilon}\kern0.6pt\varepsilon}
 
 \begin{document}
 
 % Definition of log return
 \begin{equationpage}{(1)}
-    y_t = \mathop{log} P_t - \mathop{log} P_{t-1}
+  y_t = \mathop{\rm log} P_t - \mathop{\rm log} P_{t-1}
 \end{equationpage}
 
 %%%% UNIVARIATE CASE %%%%
@@ -36,48 +43,60 @@
 
 % Univariate scale update
 \begin{equationpage}{(5)}
-  s_t^2 = (a_s s_{t-1})^2 + (b_s \varepsilon_{t-1})^2 + (c_s \bar s)^2
+  s_t^2 = (a_s s_{t-1})^2 + (b_s \varepsilon_{t-1})^2 + (c_s s)^2
 \end{equationpage}
 
 % Univariate matrix formulation
 \begin{equationpage}{(6)}
-  s_t^2 = m_{t-1} m_{t-1}^T \hbox{\rm, where }
-  m_t = \left [
+  \begin{aligned}
+    s_t^2 & = M_{t-1} M_{t-1}^T, \\
+    \hbox{\rm where } \;
+     M_t & = \left [
     \begin{matrix}
-      a_s s_t &  b_s\varepsilon_t & c_s \bar s
+      a_s s_t &  b_s\varepsilon_t & c_s s
     \end{matrix}
     \right ]
+  \end{aligned}
 \end{equationpage}
 
 %%%% MULTIVARIATE CASE %%%%
 % Multivariate sampling
 \begin{equationpage}{(7)}
-  y_t = s_t R_t z_t + \mu_t
+  {\bf y}_t = S_t R_t {\bf z}_t + {\boldmu}_t
 \end{equationpage}
 
 % Multivariate mean update
 \begin{equationpage}{(8)}
-  \mu_t = A_u \mu_{t-1} + B_u y_{t-1} + C_u \bar y
+  {\boldmu}_t  = A_u {\boldmu}_{t-1} + B_u {\bf y}_{t-1} + C_u \bar {\bf y}
 \end{equationpage}% Univariate mean update
 
 % Multivariate scale update
 \begin{equationpage}{(9)}
-  S_t^2  = M_{t-1} M_{t-1}^T \hbox{\rm, where }
-  M_t = \left [
-    \begin{matrix}
-      A_s S_t &  B_s\varepsilon_t & C_s \bar S
-    \end{matrix}
-    \right ]
+  \begin{aligned}
+    S_t^2  & = M_{t-1} M_{t-1}^T, \\
+    \hbox{\rm where } \;
+    M_t & = \left [
+      \begin{matrix}
+        A_s S_t &  B_s \mathop{\rm diag}({\boldepsilon}_t) & C_s \mathop{\rm diag} ({\bf s})
+      \end{matrix} \right ] \\
+    \hbox{\rm and } \; {\bf s} & = \left [
+      \begin{matrix}
+        s_1, s_2, \ldots, s_n
+      \end{matrix} \right ] \\
+  \end{aligned}
 \end{equationpage}
 
 % Multivariate correlation update
 \begin{equationpage}{(10)}
-  R_t R_t^T  = N_{t-1} N_{t-1}^T \hbox{\rm, where }
-  N_t = \left [
-    \begin{matrix}
-      A_r R_t &  B_rS_t^{-1} \varepsilon_t & C_r \bar R
-    \end{matrix}
-    \right ]
+  \begin{aligned}
+    R_t R_t^T  & = N_{t-1} N_{t-1}^T, \\
+    \hbox{\rm where } \;
+    N_t & = \left [
+      \begin{matrix}
+        A_r R_t &  B_rS_t^{-1} {\boldepsilon}_t & C_r R
+      \end{matrix}
+      \right ]
+  \end{aligned}
 \end{equationpage}
 
 
