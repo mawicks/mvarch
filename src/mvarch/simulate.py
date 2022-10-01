@@ -13,7 +13,6 @@ import torch
 
 REFRESH = True
 
-
 # Local modules
 from .data_sources import HugeStockMarketDatasetSource, YFinanceSource
 from .stock_data import (
@@ -81,7 +80,8 @@ def run(
     end_date=None,
     output_file=None,
     device=device,
-    pad=True,
+    pad=False,
+    alt_format=False,
 ):
     # Rewrite symbols with deduped, uppercase versions
     model = torch.load(model_file)
@@ -95,6 +95,8 @@ def run(
     logging.debug(f"symbols: {symbols}")
     logging.debug(f"Start date: {start_date}")
     logging.debug(f"End date: {end_date}")
+    logging.debug(f"Pad: {pad}")
+    logging.debug(f"Alt format: {alt_format}")
     logging.debug(f"Device: {device}")
 
     data_store = FileSystemStore("inference_data")
@@ -138,18 +140,20 @@ def run(
     logging.debug(f"total returns: \n{total_returns}")
 
     if output_file:
-        # For compatibility with another tool, the simulation must be dimmensioned
-        # as (batch_size, symbols, periods, simulations) - batch should be 1.
-        # But the above code leaves it in exactly reversed order (simulations, periods, symbols)
-        # Add a batch dimension:
-        total_returns = total_returns.unsqueeze(3)
+        if alt_format:
+            # For compatibility with another tool, the simulation must be dimmensioned
+            # as (batch_size, symbols, periods, simulations) - batch should be 1.
+            # But the above code leaves it in exactly reversed order (simulations, periods, symbols)
+            # Add a batch dimension:
+            total_returns = torch.permute(total_returns.unsqueeze(3), (3, 2, 1, 0))
 
         result = {
             "date": dt.datetime.today(),
-            "return_simulations": torch.permute(total_returns, (3, 2, 1, 0)),
+            "symbols": symbols,
+            "return_simulations": total_returns,
         }
 
-        pickle.dump(result, output_file)
+        pickle.dump(result, output_file),
 
 
 @click.command()
@@ -194,6 +198,16 @@ def run(
     type=click.File("wb"),
     help="Output file for simulation results (pickle file)",
 )
+@click.option(
+    "--pad",
+    is_flag=True,
+    help="Pad output to make day 0 be most recent price; else day 0 is first prediction",
+)
+@click.option(
+    "--alt_format",
+    is_flag=True,
+    help="Use an alternate output format (reverses order of dimensions)",
+)
 @click.argument(
     "model_file",
     type=click.File("rb"),
@@ -205,6 +219,8 @@ def main_cli(
     start_date,
     end_date,
     output_file,
+    pad,
+    alt_format,
     model_file,
 ):
 
@@ -222,6 +238,8 @@ def main_cli(
         start_date=start_date,
         end_date=end_date,
         output_file=output_file,
+        pad=pad,
+        alt_format=alt_format,
         device=device,
     )
 
