@@ -85,7 +85,14 @@ import numpy as np
 import yfinance as yf  # type: ignore
 ```
 
-Construct a model using `model_factory()`.  The `distribution` parameter value may be
+Construct a model using `model_factory()`.
+
+
+```python
+model = mvarch.model_factory(distribution="studentt", mean="zero", univariate="arch", constraint="none")
+```
+
+The `distribution` parameter value may be
 'studentt' or 'normal'.  The `mean` model parameter value can be 'zero', 'arma', or
 'constant'.  It's difficult to estimate the daily mean, which is small
 compared to the daily variance, so a reasonable choice is to model the
@@ -98,11 +105,7 @@ complexity) may be 'scalar', 'diagonal', 'triangular', or 'none'.  For a strictl
 univariate model (actually a separate univariate model for each asset), set
 `multivariate='none'`.
 
-```python
-model = mvarch.model_factory(distribution="studentt", mean="zero", univariate="arch", constraint="none")
-```
-
-Download some historic data for the above symbols.
+Download some historic data for the above symbols.  The `yfinance` package provides a convenient way to do this:
 
 ```python
 symbols = ("SPY", "QQQ", "BND", "VNQ")
