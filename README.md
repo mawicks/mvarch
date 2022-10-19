@@ -121,9 +121,9 @@ fit_history = df.values
 
 Fit the model (This may take a while. To reduce the time, consider reducing the
 computational complexity by subsetting the history by, for example,
-`fit_history = df.values[-100:]` or by reducing by modifying the
+`fit_history = df.values[-100:]` or by modifying the
 `constraint` argument in the call to `model_factory()` to be either
-`scalar` or `diagonal`.)  Note that the log-likelihood reported by the
+`"scalar"` or `"diagonal"`.)  Note that the log-likelihood reported by the
 following commanbds is the *mean* or per-sample log-likelihood
 averaged over the number of observations.  It is not the total
 log-likelihood.
