@@ -19,8 +19,8 @@ from mvarch.stock_data import (
     CachingSymbolHistoryLoader,
 )
 
-FOCUS_START = dt.datetime(year=2009, month=1, day=1)
-FOCUS_END = dt.datetime(year=2010, month=10, day=1)
+ZOOM_START = dt.datetime(year=2009, month=1, day=1)
+ZOOM_END = dt.datetime(year=2010, month=10, day=1)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -38,42 +38,40 @@ def run(use_hsmd):
 
     combiner = PriceHistoryConcatenator()
     full_history = combiner(history_loader(symbols))
-    print(full_history.head())
 
     last_close = full_history.loc[full_history.index[-1], (symbols, "close")].values
-    print("last_close", last_close)
 
-    log_return_df = full_history.loc[:, (symbols, "log_return")]  # type: ignore
+    # Choose a specific time period for a "zoomed" plot.
+    zoom_history = full_history.loc[
+        ZOOM_START:ZOOM_END,
+        (symbols, "log_return"),
+    ]
 
-    fit_history = log_return_df.values
+    fit_history = full_history.loc[:, (symbols, "log_return")].values
+
+    # Truncaate the data for summary purposes:
+    TAIL_SIZE = 500
+    evaluate_tail = full_history.index[-TAIL_SIZE:]
+    evaluate_history = full_history.loc[evaluate_tail, (symbols, "log_return")].values
+
     model = mvarch.model_factory(
         distribution="studentt", mean="zero", constraint="none"
     )
-
-    focus_period = full_history.loc[
-        FOCUS_START:FOCUS_END,
-        (symbols, "log_return"),
-    ]
 
     print("starting fit()...")
     model.tune_all = True
     model.fit(fit_history)
     print(f"Likelihood: {model.mean_log_likelihood(fit_history):.4f}")
 
-    # Truncaate the data for summary purposes:
-    TAIL_SIZE = 500
-    evaluate_tail = log_return_df.index[-TAIL_SIZE:]
-    evaluate_history = log_return_df.loc[evaluate_tail].values
-
-    # 0: Data for focus plot
+    # 0: Data for "Zoomed" plot
     (
-        focus_mv_scale_predicted,
-        focus_uv_scale_predicted,
-        focus_mean_predicted,
-        focus_mv_scale_history,
-        focus_uv_scale_history,
-        focus_mean_history,
-    ) = model.predict(focus_period.values)
+        zoomed_mv_scale_predicted,
+        zoomed_uv_scale_predicted,
+        zoomed_mean_predicted,
+        zoomed_mv_scale_history,
+        zoomed_uv_scale_history,
+        zoomed_mean_history,
+    ) = model.predict(zoom_history.values)
 
     # Use cases:
     # 1: Get correlation, std deviation, and mean estimates for
@@ -133,13 +131,13 @@ def run(use_hsmd):
     plt.figure(figsize=(6, 5))
     plt.title(f"{symbols[0]} - Annualized Daily Return and Annualized Volatilty")
     plt.plot(
-        focus_period.index,
-        np.sqrt(252) * focus_period.values[:, 0],
+        zoom_history.index,
+        np.sqrt(252) * zoom_history.values[:, 0],
         label="Annualized Daily Return",
     )
     plt.plot(
-        focus_period.index,
-        np.sqrt(252) * model.distribution.std_dev() * focus_uv_scale_history[:, 0],
+        zoom_history.index,
+        np.sqrt(252) * model.distribution.std_dev() * zoomed_uv_scale_history[:, 0],
         label="Annualized Volatility Estimate",
     )
     plt.legend()
