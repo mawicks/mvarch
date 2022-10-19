@@ -96,11 +96,11 @@ The `distribution` parameter value may be
 `"studentt"` or `"normal"`.  The `mean` model parameter value can be `"zero"`, `"arma"`, or
 `"constant"`.  It's difficult to estimate the daily mean, which is small
 compared to the daily variance, so a reasonable choice is to model the
-mean as `"zero"`.  The `"univariate"` parameter may be `"arch"` or `"none"`. It determines
+mean as `"zero"`.  The `"univariate"` parameter value may be `"arch"` or `"none"`. It determines
 whether the marginal volatilities are first estimated in a univariate 'arch' model (the DCC appreach)
 with correlations estimated in a multivariate model or whether the volatilities and correlations
 are combined into a single multivariate covariance estimate (`"none"`).
-The `constraint` parameter (in increasing order of computational
+The `constraint` parameter value (in increasing order of computational
 complexity) may be `"scalar"`, `"diagonal"`, `"triangular"`, or `"none"`.  For a strictly
 univariate model (actually a separate univariate model for each asset), set
 `multivariate="none"`.
