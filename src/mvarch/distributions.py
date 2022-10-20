@@ -86,7 +86,7 @@ class StudentTDistribution(Distribution):
 
     def std_dev(self) -> float:
         if torch.abs(self.df) > 2:
-            return float(torch.abs(self.df) / torch.abs(self.df - 2))
+            return float(torch.sqrt(torch.abs(self.df) / torch.abs(self.df - 2)))
         elif self.df > 1:
             return float("inf")
         else:

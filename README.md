@@ -40,7 +40,7 @@ such as by computing the variance on a trailing sample of returns.
 That is not an accurate approach.  During periods of increasing
 volatility this would underestimate the volatility since the
 volatility today can be significantly greater than the volatility of
-the past N days.  Volatility can change rapidly Likewise, during
+the past N days.  Volatility can change rapidly. Likewise, during
 periods of decreasing volatility the naive approach would overestimate
 the volatility.  By using ARMA approaches, you can determine the
 *instantaneous* volatility to provide more accurate estimates of the
@@ -65,7 +65,7 @@ tensors that can be converted to `numpy` arrays by calling their
 `MVARCH` is a Python package which can be installed either by running
 `pip install .` from the top
 level directory of a `git clone` checkout, or by
-running `pip install and providing a URL for the github repo,
+running `pip install` and providing a URL for the github repo,
 e.g.,
 
 ```console
@@ -85,18 +85,27 @@ import numpy as np
 import yfinance as yf  # type: ignore
 ```
 
-Construct a model using `model_factory()`.  Distribution may be
-'studentt' or 'normal'.  The mean mode can be 'zero', 'arma', or
-'constant'.  It's difficult to estiamte the daily mean, which is small
-compared to the daily variance, so a resonable choice is to model the
-mean as 'zero'.  Constraints (in increasing order of computational
-complexity) may be 'scalar', 'diagonal', 'triangular', or 'none'
+Construct a model using `model_factory()`.
+
 
 ```python
-model = mvarch.model_factory(distribution="studentt", mean="zero", constraint="none")
+model = mvarch.model_factory(distribution="studentt", mean="zero", univariate="arch", constraint="none")
 ```
 
-Download some historic data for the above symbols.
+The `distribution` parameter value may be
+`"studentt"` or `"normal"`.  The `mean` model parameter value can be `"zero"`, `"arma"`, or
+`"constant"`.  It's difficult to estimate the daily mean, which is small
+compared to the daily variance, so a reasonable choice is to model the
+mean as `"zero"`.  The `"univariate"` parameter value may be `"arch"` or `"none"`. It determines
+whether the marginal volatilities are first estimated in a univariate 'arch' model (the DCC appreach)
+with correlations estimated in a multivariate model or whether the volatilities and correlations
+are combined into a single multivariate covariance estimate (`"none"`).
+The `constraint` parameter value (in increasing order of computational
+complexity) may be `"scalar"`, `"diagonal"`, `"triangular"`, or `"none"`.  For a strictly
+univariate model (actually a separate univariate model for each asset), set
+`multivariate="none"`.
+
+Download some historic data for the above symbols.  The `yfinance` package provides a convenient way to do this:
 
 ```python
 symbols = ("SPY", "QQQ", "BND", "VNQ")
@@ -110,11 +119,11 @@ df = np.log1p(data.loc[:, ("Adj Close", symbols)].dropna().pct_change().dropna()
 fit_history = df.values
 ```
 
-Fit the model (This may take a while. Consider reducing the
+Fit the model (This may take a while. To reduce the time, consider reducing the
 computational complexity by subsetting the history by, for example,
-`fit_history = df.values[-100:]` or by reducing by modifying the
+`fit_history = df.values[-100:]` or by modifying the
 `constraint` argument in the call to `model_factory()` to be either
-`scalar` or `diagonal`.)  Note that the log-likelihood reported by the
+`"scalar"` or `"diagonal"`.)  Note that the log-likelihood reported by the
 following commanbds is the *mean* or per-sample log-likelihood
 averaged over the number of observations.  It is not the total
 log-likelihood.
@@ -124,10 +133,10 @@ model.fit(fit_history)
 print(f"Likelihood: {model.mean_log_likelihood(fit_history):.4f}")
 ```
 
-If you ran this code on 2022-09-12, you might see something like:
+If you ran this code on 2022-09-19, you might see something like:
 
-```
-Likelihood: 15.2868
+```console
+Likelihood: 15.2849
 ```
 
 ### Using the Model
@@ -177,17 +186,17 @@ print(
 
 ```
 
-If you ran this code on 2022-09-12, you might see something like:
+If you ran this code on 2022-09-19, you might see something like:
 
 ```console
 Next day volatility prediction (annualized):
-[0.24272123 0.30139446 0.08419606 0.2395135 ]
+[0.27073285 0.33625355 0.05883523 0.25986665]
 
 Next day correlation prediction:
-[[1.         0.9603142  0.12006433 0.7841618 ]
- [0.9603142  1.         0.14455643 0.7046279 ]
- [0.12006433 0.14455643 1.         0.22765702]
- [0.7841618  0.7046279  0.22765702 0.9999998 ]]
+[[1.         0.9702157  0.10875233 0.8384389 ]
+ [0.9702157  1.         0.12562908 0.77586114]
+ [0.10875233 0.12562908 1.         0.22840934]
+ [0.8384389  0.77586114 0.22840934 0.9999999 ]]
 ```
 
 A sample plot of historic volatility obtained from this data follows
@@ -232,22 +241,22 @@ print(
 
 ```
 
-If you ran this code on 2022-09-12, you might see something like:
+If you ran this code on 2022-09-19, you might see something like:
 
 ```console
 Std dev of total returns over simulation period (126 days):
-[0.15605381 0.18821143 0.03908034 0.18603522]
+[0.19662732 0.2331021  0.03502716 0.22605737]
 
 Correlation of total returns over simulation period (126 days):
-[[ 1.          0.91632208 -0.08541442  0.69823601]
- [ 0.91632208  1.         -0.03951417  0.57860402]
- [-0.08541442 -0.03951417  1.          0.02317722]
- [ 0.69823601  0.57860402  0.02317722  1.        ]]
+[[ 1.          0.86296704 -0.08967935  0.70158927]
+ [ 0.86296704  1.         -0.07110933  0.54363716]
+ [-0.08967935 -0.07110933  1.          0.02450721]
+ [ 0.70158927  0.54363716  0.02450721  1.        ]]
 ```
 
-Plots showing historic prices and *simulated* future prices obtained
+Historic prices and *simulated* future prices obtained
 from this data are shown in the following plots (code used to
-construct plots is in [example.py](/src/mvarch/example.py)).  Note
+construct the plots is in [example.py](/src/mvarch/example.py)).  Note
 that SPY and QQQ are strongly correlated with one another, VNQ is
 somewhat correlated with SPY and QQQ, and BND is not very correlated
 with the others.  These correlations appear in the historic data as
