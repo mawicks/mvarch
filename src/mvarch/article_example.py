@@ -126,7 +126,7 @@ def run(use_hsmd):
     plt.style.use("ggplot")
     # **************
 
-    plt.figure(figsize=(6, 5))
+    plt.figure(figsize=(11, 5))  # Was (6,5)
     plt.title(f"{symbols[0]} - Annualized Daily Return and Annualized Volatilty")
     plt.plot(
         zoom_history.index,
