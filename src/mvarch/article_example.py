@@ -111,11 +111,9 @@ def run(use_hsmd):
     # Return value has shape (SIMULATION_SAMPLES, SIMULATION_PERIODS, STOCK_SYMBOLS)
 
     # Calculate the standard deviation of the returns for each variable from the simulation:
-    std_dev = np.std(simulated_returns, axis=0)[SIMULATION_PERIODS - 1]
+    std_dev = np.std(simulated_returns[:, -1, :], axis=0)
     # Calculate the correlation coefficiens from the simulation:
-    corr_coef = np.corrcoef(
-        simulated_returns[:, SIMULATION_PERIODS - 1, :], rowvar=False
-    )
+    corr_coef = np.corrcoef(simulated_returns[:, -1, :], rowvar=False)
     print(
         f"Std dev of simulation period ({SIMULATION_PERIODS} days) total returns:\n{std_dev}"
     )
