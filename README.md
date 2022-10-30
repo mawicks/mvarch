@@ -53,6 +53,11 @@ or by training a model [using a command-line tool](#training-a-model-using-the-c
 included in the package.  Making effective use of the model likely
 requires [writing some Python code](#using-the-model).
 
+This README provides some sample code to get started.  For more details about the algorithms used,
+see the article
+[GARCH-Like Multivariate Models for Stock Prices](https://medium.datadriveninvestor.com/garch-like-multivariate-volatility-models-for-stock-prices-c322dc9118bc)
+in [Data Driven Investor](https://medium.datadriveninvestor.com/).
+
 `MVARCH` is implemented in PyTorch, but this is mostly hidden
 from the user.  Return values from `MVARCH` methods are PyTorch
 tensors that can be converted to `numpy` arrays by calling their
