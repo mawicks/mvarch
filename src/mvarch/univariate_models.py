@@ -7,15 +7,15 @@ from typing import Any, Dict, List, Optional, Protocol, Tuple
 import torch
 
 # Local modules
-from . import constants
-from .distributions import Distribution, NormalDistribution
-from .mean_models import MeanModel, ZeroMeanModel
-from .parameters import (
+from mvarch import constants
+from mvarch.distributions import Distribution, NormalDistribution
+from mvarch.mean_models import MeanModel, ZeroMeanModel
+from mvarch.parameters import (
     Parameter,
     DiagonalParameter,
 )
-from .optimize import optimize
-from .util import to_tensor
+from mvarch.optimize import optimize
+from mvarch.util import to_tensor
 
 
 def marginal_conditional_log_likelihood(
@@ -378,7 +378,9 @@ class UnivariateARCHModel(UnivariateScalingModel):
         self.device = device
         self.mean_model = mean_model
 
-    def initialize_parameters(self, observations: torch.Tensor) -> None:
+    def initialize_parameters(
+        self, observations: torch.Tensor, constant_c=False
+    ) -> None:
         dim = observations.shape[1]
         self.a = DiagonalParameter(
             dim, 1.0 - constants.INITIAL_DECAY, device=self.device
@@ -386,8 +388,12 @@ class UnivariateARCHModel(UnivariateScalingModel):
         self.b = DiagonalParameter(dim, constants.INITIAL_DECAY, device=self.device)
         self.c = DiagonalParameter(dim, 1.0, device=self.device)
         self.d = DiagonalParameter(dim, 1.0, device=self.device)
-        self.sample_scale = torch.std(observations, dim=0)
+        if constant_c:
+            self.sample_scale = torch.tensor([1.0] * dim)
+        else:
+            self.sample_scale = torch.std(observations, dim=0)
         self.__dim = dim
+        self.constant_c = constant_c
 
     def set_parameters(self, **kwargs: Any) -> None:
         a = kwargs["a"]
@@ -395,6 +401,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         c = kwargs["c"]
         d = kwargs["d"]
         sample_scale = kwargs["sample_scale"]
+        constant_c = kwargs.get("constant_c", False)
 
         a = to_tensor(a, device=self.device, requires_grad=True)
         b = to_tensor(b, device=self.device, requires_grad=True)
@@ -423,6 +430,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
         self.d = DiagonalParameter(dim).set(d)
 
         self.sample_scale = sample_scale
+        self.constant_c = constant_c
 
         self.__dim = dim
 
@@ -438,6 +446,7 @@ class UnivariateARCHModel(UnivariateScalingModel):
             "c": safe_value(self.c),
             "d": safe_value(self.d),
             "sample_scale": self.sample_scale,
+            "constant_c": self.constant_c,
         }
 
     @property
@@ -448,7 +457,10 @@ class UnivariateARCHModel(UnivariateScalingModel):
         if self.a is None or self.b is None or self.c is None or self.d is None:
             raise RuntimeError("UnivariateARCHModel has not been trained/initialized")
 
-        return [self.a.value, self.b.value, self.c.value, self.d.value]
+        if self.constant_c:
+            return [self.a.value, self.b.value, self.d.value]
+        else:
+            return [self.a.value, self.b.value, self.c.value, self.d.value]
 
     def log_parameters(self) -> None:
         if self.a and self.b and self.c and self.d and self.sample_scale is not None:
