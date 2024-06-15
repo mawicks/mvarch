@@ -649,6 +649,497 @@ class MultivariateARCHModel:
         return output, mv_scale, uv_scale, mean
 
 
+class MultivariateComponentARCHModel:
+    univariate_model: UnivariateScalingModel
+    distribution: Distribution
+
+    device: Optional[torch.device]
+
+    mv_scale: Optional[Parameter]
+
+    __dim: Optional[int]
+
+    def __init__(
+        self,
+        univariate_model: UnivariateScalingModel = UnivariateUnitScalingModel(),
+        device: torch.device = None,
+    ):
+        self.univariate_model = univariate_model
+        self.distribution = univariate_model.distribution
+
+        self.distribution.set_device(device)
+        self.device = device
+
+        # There should be a better way to do this.  Maybe add a set_device method.
+        self.univariate_model.device = device
+
+        self.__dim = self.mv_scale = None
+
+    def initialize_parameters(
+        self, unscaled_centered_observations: torch.Tensor
+    ) -> None:
+        dim = unscaled_centered_observations.shape[1]
+        self.mv_scale = FullParameter(dim, 1.0, self.device)
+        self.__dim = dim
+
+        # Recenter. This is important when the centering in the caller
+        # was done with initialized but untuned means.
+        unscaled_centered_observations = unscaled_centered_observations - torch.mean(
+            unscaled_centered_observations, dim=0
+        )
+
+        # Pre-multiply by the sqrt of the sample size.
+        # This is equivalent to dividing o.T@o by n
+        # C = E[o.T @ o] approximated by (o.T @o)/n
+
+        self.sample_scale = self.transform_matrix(
+            unscaled_centered_observations.T
+            / torch.sqrt(torch.tensor(unscaled_centered_observations.shape[0]))
+        )
+
+    def set_parameters(self, dim: int, mv_scale: Any) -> None:
+        mv_scale = to_tensor(mv_scale, device=self.device, requires_grad=True)
+
+        if len(mv_scale.shape) != 2 or mv_scale.shape[0] != mv_scale.shape[1]:
+            raise ValueError(
+                f"The shape of mv_scale ({mv_scale.shape}) must be square."
+            )
+
+        p_dim = mv_scale.shape[0]
+        self.mv_scale = FullParameter(p_dim).set(mv_scale)
+        self.__dim = dim
+
+    @property
+    def dimension(self):
+        return self.__dim
+
+    def get_parameters(self) -> Dict[str, Any]:
+        safe_value = lambda x: x.value.detach().numpy() if x is not None else None
+        return {
+            "dim": self.__dim,
+            "mv_scale": safe_value(self.mv_scale),
+        }
+
+    def get_optimizable_parameters(self) -> List[torch.Tensor]:
+        if self.mv_scale is None:
+            raise RuntimeError(
+                "MultivariateComponentARCHModel has not been initialized"
+            )
+        return [self.mv_scale.value]
+
+    def log_parameters(self) -> None:
+        if self.mv_scale:
+            logging.info(
+                f"Multivariate ARCH model parameters:\n"
+                f"mv_scale: {self.mv_scale.value.detach().numpy()}"
+            )
+        else:
+            logging.info("Multivariate ARCH model has no initialized parameters")
+
+    def transform_matrix(self, scale_matrix):
+        # We're looking for S satisfying x = Sv that E[v @ v.T] is diagonal,
+        # The covariance matrix C = E[x @ x.T] is approximated by the sample
+        # covariance
+        #     C = scale_matrix @ scale_matrix.T, which is equal to
+        #     u @ sigma @ sigma @ u.T
+        # where u @ sigma @ vh is the SVD of scale_matrix.
+        # Therefore, we want
+        #     E[v @ v.T] = S^{-1} C S.T^{-1}
+        #                = S^{-1} u sigma sigma u.T S.T^{-1}
+        # to be diagonal.  This will be the case if S = u.T (since u is unitary)
+        # in which case sigma * sigma will be the covariance of v.
+
+        # This is only to initialize a scale matrix.  We let it float
+        # after initialization.
+
+        # We only need u.
+        u = torch.linalg.svd(scale_matrix, full_matrices=False)[0]
+        return u.T
+
+    def _predict(
+        self,
+        observations: torch.Tensor,
+        sample: bool = False,
+        scale_initial_value=None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Given a, b, c, d, and observations, generate the *estimated*
+        lower triangular square roots of the sequence of covariance matrix estimates.
+
+        Argument:
+            observations: torch.Tensor of dimension (n_obs, n_symbols) of observations
+            sample: bool - Run the model in 'sampling' mode, in which
+                           case `observations` unit variance noise
+                           rather than actual observations.
+            initial_h: torch.Tensor - Initial covariance lower-triangular sqrt.
+        Returns:
+            scale_next: torch.Tensor prediction for next unobserved value
+            scale: torch.Tensor of predictions for each observation
+        """
+        if scale_initial_value is not None:
+            if (
+                len(scale_initial_value.shape) != 2
+                or scale_initial_value.shape[0] != scale_initial_value.shape[1]
+            ):
+                raise ValueError(
+                    f"Shape of scale_intial_value ({scale_initial_value.shape}) must be square "
+                )
+            scale_t = scale_initial_value
+        else:
+            scale_t = self.d @ self.sample_scale
+
+        # We require the inttial scale matrix satisfy some constraints
+        # such as being lower traingular with positive diagonal entries
+        scale_t = self.transform_matrix(scale_t)
+
+        if constants.DEBUG:  # pragma: no cover
+            print(f"Initial scale: {scale_t}")
+            print(f"self.d: {self.d.value if self.d is not None else None}")
+            print(f"self.sample_scale: {self.sample_scale}")
+        scale_sequence = []
+
+        for obs in observations:
+            # Store the current ht before predicting next one
+            scale_sequence.append(scale_t)
+
+            # While searching over the parameter space, an unstable value for `a` may be tested.
+            # Clamp to prevent it from overflowing.
+
+            a_scale_t = torch.clamp(
+                self.a @ scale_t, min=constants.MIN_CLAMP, max=constants.MAX_CLAMP
+            )
+
+            if sample:
+                # obs is noise that must be scaled
+                obs = scale_t @ obs
+
+            b_o = (self.b @ obs).unsqueeze(1)
+            c_sample_scale = self.c @ self.sample_scale
+
+            # The covariance is
+            # a_ht @ a_ht.T + b_o @ b_o.T + (c @ sample_scale) @ (c @ sample_scale).T
+            # Unnecessary squaring is discouraged for nunerical stability.
+            # Instead, we use only square roots and never explicity
+            # compute the covariance.  This is a common 'trick' achieved
+            # by concatenating the square roots in a larger array and
+            # computing the QR factoriation, which computes the square
+            # root of the sum of squares.  The covariance matrix isn't
+            # formed explicitly in this code except at the very end when
+            # it's time to return the covariance matrices to the user.
+
+            m = torch.cat((a_scale_t, b_o, c_sample_scale), dim=1)
+
+            # Transform `m` to an equivalent matrix having required dimensions and properties
+            scale_t = self.transform_matrix(m)
+
+        scale = torch.stack(scale_sequence)
+        return scale_t, scale
+
+    def __mean_log_likelihood(
+        self,
+        centered_observations: torch.Tensor,
+        uv_scale: torch.Tensor,
+    ) -> torch.Tensor:
+        """This computes the mean per-sample log likelihood (the total log
+        likelihood divided by the number of samples).
+
+        """
+        # We pass uv_scale into this function rather than computing it
+        # here because __mean_log_likelihood() is called in a training
+        # loop and the univariate parameters are held constant while
+        # the multivariate parameters are trained.  In other words,
+        # uv_scale is constant through the optimization and we'd be
+        # computing it on every iteration if we computed it here.
+        # Similarly _predict() doesn't know about the univariate model
+        # since it sees only scaled observations.  Clients should use only
+        # mean_log_likelihood() and predict() which are more intuitive.
+
+        scaled_centered_observations = centered_observations / uv_scale
+
+        mv_scale = self._predict(scaled_centered_observations)[1]
+
+        # It's important to use non-scaled observations in likelihood function
+        mean_ll = joint_conditional_log_likelihood(
+            centered_observations,
+            mv_scale=mv_scale,
+            uv_scale=uv_scale,
+            distribution=self.distribution.get_instance(),
+        )
+
+        return mean_ll
+
+    @torch.no_grad()
+    def mean_log_likelihood(self, observations: torch.Tensor) -> float:
+        """This is the inference version of mean_log_likelihood(), which is
+        the version clients would normally use.  It computes the mean
+        per-sample log likelihood (the total log likelihood divided by
+        the number of samples).
+
+        Arguments:
+            observations: torch.Tensor of shape (n_obs, n_symbols)
+
+        Return value:
+            float - mean (per sample) log likelihood
+
+        """
+        observations = to_tensor(observations, device=self.device)
+        uv_scale, uv_mean = self.univariate_model.predict(observations)[2:]
+        centered_observations = observations - uv_mean
+        result = self.__mean_log_likelihood(centered_observations, uv_scale)
+
+        return float(result)
+
+    def fit(self, observations: torch.Tensor) -> None:
+        """Fit a multivariate model along with any underlying univariate,
+        mean, and distribution models.
+
+        """
+        centered_observations: Optional[torch.Tensor]
+        uv_scale: Optional[torch.Tensor]
+        uv_mean: Optional[torch.Tensor]
+
+        observations = to_tensor(observations, device=self.device)
+
+        # If the underlying univariate model has optimizeable
+        # parameters, optimize it.  The fit() call also tunes the mean
+        # model and the distribution model parameters contained within
+        # the univariate model.
+
+        if self.univariate_model.is_optimizable:
+            self.univariate_model.fit(observations)
+            uv_scale, uv_mean = self.univariate_model.predict(observations)[2:]
+            centered_observations = observations - uv_mean
+            self.initialize_parameters(centered_observations / uv_scale)
+        else:
+            # Since we don't call fit() on the univariate model, its
+            # mean model will have be initialized. Initialize its mean
+            # model directly.
+            self.univariate_model.mean_model.initialize_parameters(observations)
+            self.univariate_model.initialize_parameters(observations)
+            self.initialize_parameters(observations)
+            centered_observations = uv_scale = uv_mean = None
+
+        # We always optimize the multivariate model parameters here.
+        parameters = self.get_optimizable_parameters()
+
+        # If the univariate model isn't optimizable alone, add the
+        # mean model parameters and the distribution parameters,
+        # because they weren't optimized above.
+
+        if not self.univariate_model.is_optimizable or self.tune_all:
+            parameters = (
+                parameters
+                + self.univariate_model.mean_model.get_optimizable_parameters()
+                + self.distribution.get_optimizable_parameters()
+            )
+        if self.tune_all:
+            parameters = parameters + self.univariate_model.get_optimizable_parameters()
+
+        optim = torch.optim.LBFGS(
+            parameters,
+            max_iter=constants.PROGRESS_ITERATIONS,
+            lr=constants.LEARNING_RATE,
+            line_search_fn="strong_wolfe",
+        )
+
+        def loss_closure() -> float:
+            safe_value = lambda x: x.value if x is not None else None
+            if constants.DEBUG:  # pragma: no cover
+                print(f"a: {safe_value(self.a)}")
+                print(f"b: {safe_value(self.b)}")
+                print(f"c: {safe_value(self.c)}")
+                print(f"d: {safe_value(self.d)}")
+                print()
+
+            optim.zero_grad()
+
+            # If the mean model and distribution in the
+            # underlying univariate model are being optimized (which happens
+            # When the univariate model itself is *not* optimizable,
+            # then the univariate predictions must be recomputed here.
+            # Otherwise they come from above.
+            if self.univariate_model.is_optimizable and not self.tune_all:
+                assert isinstance(centered_observations, torch.Tensor)
+                assert isinstance(uv_scale, torch.Tensor)
+
+                closure_centered_observations = centered_observations
+                closure_uv_scale = uv_scale
+            else:
+                closure_uv_mean = self.univariate_model.mean_model._predict(
+                    observations
+                )[1]
+                closure_centered_observations = observations - closure_uv_mean
+                closure_uv_scale = self.univariate_model._predict(
+                    closure_centered_observations
+                )[1]
+
+            # Do not use scaled observations here; centering is okay.
+            loss = -self.__mean_log_likelihood(
+                closure_centered_observations, uv_scale=closure_uv_scale
+            )
+            loss.backward()
+            return float(loss)
+
+        optimize(optim, loss_closure, "multivariate model")
+
+        self.distribution.log_parameters()
+        self.univariate_model.mean_model.log_parameters()
+        self.univariate_model.log_parameters()
+        self.log_parameters()
+
+        logging.debug("Gradients: ")
+        safe_grad = lambda x: x.value.grad if x is not None else None
+        logging.debug(f"a.grad:\n{safe_grad(self.a)}")
+        logging.debug(f"b.grad:\n{safe_grad(self.b)}")
+        logging.debug(f"c.grad:\n{safe_grad(self.c)}")
+        logging.debug(f"d.grad:\n{safe_grad(self.d)}")
+
+    @torch.no_grad()
+    def predict(
+        self,
+        observations: torch.Tensor,
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
+        """
+        This is the inference version of predict(), which is the version clients would normally use.
+        It doesn't compute any gradient information, so it should be faster.
+        """
+        observations = to_tensor(observations, device=self.device)
+
+        (
+            uv_scale_next,
+            uv_mean_next,
+            uv_scale,
+            uv_mean,
+        ) = self.univariate_model.predict(observations)
+
+        centered_observations = observations - uv_mean
+        scaled_centered_observations = centered_observations / uv_scale
+
+        mv_scale_next, mv_scale = self._predict(scaled_centered_observations)
+
+        return (
+            mv_scale_next,
+            uv_scale_next,
+            uv_mean_next,
+            mv_scale,
+            uv_scale,
+            uv_mean,
+        )
+
+    @torch.no_grad()
+    def sample(
+        self,
+        n: Union[torch.Tensor, int],
+        mv_scale_initial_value: Any = None,
+        uv_scale_initial_value: Any = None,
+        mean_initial_value: Any = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Generate a random sampled output from the model.
+        Arguments:
+            n: torch.Tensor - Noise to use as input or
+               int - Number of points to generate, in which case GWN is used.
+            initial_h: torch.Tensor - Initial condition for sqrt of
+                       covariance matrix (or correlation matrix when
+                       internal univariate model is used)
+            initial_sigma: torch.Tensor - Initial sigma for internal
+                            univariate model if one is used
+        Returns:
+            output: torch.Tensor - Sample model output
+            mv_scale: torch.Tensor - Sqrt of covariance/correlation matrix used to scale the sample
+            uv_scale: torch.Tensor - Sqrt of variance used to scale the sample
+            mean: torch.Tensor - Mean
+        """
+        if self.a is None or self.b is None or self.c is None or self.d is None:
+            raise RuntimeError(
+                "MultivariateARCHModel has not been trained or initialized"
+            )
+
+        if isinstance(n, int):
+            n = self.distribution.get_instance().sample((n, self.sample_scale.shape[0]))
+
+        # Next line is to keep mypy happy.
+        assert isinstance(n, torch.Tensor)
+
+        mv_scale = self._predict(
+            n, sample=True, scale_initial_value=mv_scale_initial_value
+        )[1]
+        mv_scaled_noise = (mv_scale @ n.unsqueeze(2)).squeeze(2)
+
+        output, uv_scale, uv_mean = self.univariate_model.sample(
+            mv_scaled_noise,
+            scale_initial_value=uv_scale_initial_value,
+            mean_initial_value=mean_initial_value,
+        )
+
+        return output, mv_scale, uv_scale, uv_mean
+
+    @torch.no_grad()
+    def simulate(self, observations: Any, periods: int, samples: Optional[int] = None):
+        """
+        Performs a Monte Carlo simulation by drawing `samples` samples from the modeo
+        for the next `periods` time periods.
+        Arguments:
+            observations: Any - Observations used to determine initial state for
+                                the simulation.  The simulation will simulate the
+                                conditions immediately following the observations.
+            periods: int - Number of time periods per simulation
+            samples: int - Number of simulations to perform (one if not provided)
+        Returns:
+            output: torch.Tensor - Shape (samples, periods, dimension) containing simulated outputs
+            mv_scale: torch.Tensor - Shape (samples, periods, dimension, dimension) containing the
+                                     multivariate scaling (e.g., sqrt of correlation matrix).
+            uv_scale: torch.Tensor - Shape (samples, periods, dimension) containing univariate
+                                     scaling (e.g., sqrt of the variance)
+            mean: torch.Tensor - Shape (samples, periods, dimension) containing mean
+
+        Note: One simulation is generated and the `samples` dimension of the output is
+              dropped if samples == None
+
+        """
+        observations = to_tensor(observations)
+        initial_mv_state, initial_uv_state, initial_mean_state = self.predict(
+            observations
+        )[:3]
+
+        output_list = []
+        mv_scale_list = []
+        uv_scale_list = []
+        mean_list = []
+
+        for _ in range(samples if samples is not None else 1):
+            output, mv_scale, uv_scale, mean = self.sample(
+                periods,
+                mv_scale_initial_value=initial_mv_state,
+                uv_scale_initial_value=initial_uv_state,
+                mean_initial_value=initial_mean_state,
+            )
+
+            output_list.append(output)
+            mv_scale_list.append(mv_scale)
+            uv_scale_list.append(uv_scale)
+            mean_list.append(mean)
+
+            output = torch.stack(output_list, dim=0)
+            mv_scale = torch.stack(mv_scale_list, dim=0)
+            uv_scale = torch.stack(uv_scale_list, dim=0)
+            mean = torch.stack(mean_list, dim=0)
+
+        if samples is None:
+            output = output.squeeze(0)
+            mv_scale = mv_scale.squeeze(0)
+            uv_scale = uv_scale.squeeze(0)
+            mean = mean.squeeze(0)
+
+        return output, mv_scale, uv_scale, mean
+
+
 if __name__ == "__main__":  # pragma: no cover
     logging.basicConfig(
         level=logging.INFO,
