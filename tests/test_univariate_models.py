@@ -160,7 +160,7 @@ def test_arch_model(univariate_arch_model):
     assert univariate_arch_model.is_optimizable == True
 
     utils.set_and_check_parameters(
-        univariate_arch_model, observations, ARCH_VALID_PARAMETERS, 5, 4
+        univariate_arch_model, observations, ARCH_VALID_PARAMETERS, 6, 4
     )
 
     # Case 1: _predict with sample=False and specified initial value

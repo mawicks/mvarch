@@ -12,14 +12,14 @@ import torch
 
 
 # Local modules
-from .data_sources import HugeStockMarketDatasetSource, YFinanceSource
-from .stock_data import (
+from mvarch.data_sources import HugeStockMarketDatasetSource, YFinanceSource
+from mvarch.stock_data import (
     PriceHistoryConcatenator,
     FileSystemStore,
     CachingSymbolHistoryLoader,
 )
 
-from .model_factory import model_factory
+from mvarch.model_factory import model_factory
 
 logging.basicConfig(
     level=logging.INFO,

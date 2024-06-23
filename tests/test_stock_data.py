@@ -1,34 +1,15 @@
-import pytest
-
 # Standard Python modules
 import os
 from unittest.mock import patch
 
 # Third party modules
-import pandas as pd  # type: ignore
 
 # Local imports
 import mvarch.util as util
 import mvarch.stock_data as stock_data
-
-SAMPLE_DF = pd.DataFrame(
-    {
-        "date": pd.to_datetime(["2020-01-01", "2020-01-02", "2020-01-03"]),
-        "open": [1.0, 2.0, 3.0],
-        "close": [0.5, 2.5, 3.1],
-    }
-).set_index("date")
+from tests.conftest import SAMPLE_DF
 
 SAMPLE_PATH = "any_path"
-
-
-@pytest.fixture
-def data_source():
-    """
-    Create an instance of a data source for testing
-    """
-    mock_data_source = lambda symbols: {s.upper(): SAMPLE_DF for s in symbols}
-    return mock_data_source
 
 
 def test_symbol_history_reader_and_writer(tmp_path):
