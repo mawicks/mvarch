@@ -14,13 +14,15 @@ click = ">=8"
 pytz = "^2022.1"
 numpy = ">=1.22"
 urllib3 = ">=1.25"
-coverage = "^6.4.4"
 pylint = "^2.15.0"
+statsmodels = "^0.14.0"
 
 [tool.poetry.dev-dependencies]
 black = ">=22"
+coverage = "^6.4.4"
 mypy = ">=0"
 pytest = ">=5"
+pytest-cov = "^5.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0a6", "setuptools>=46.0.0"]
