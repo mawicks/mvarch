@@ -7,7 +7,7 @@ from unittest.mock import patch
 # Local imports
 import mvarch.util as util
 import mvarch.stock_data as stock_data
-from tests.conftest import SAMPLE_DF
+from tests.conftest import get_sample_df
 
 SAMPLE_PATH = "any_path"
 
@@ -18,7 +18,7 @@ def test_symbol_history_reader_and_writer(tmp_path):
     # Use writer to write SAMPLE_df
 
     # But first, intentionally reverse the order of dates.
-    sample_copy = SAMPLE_DF.reset_index().sort_values("date", ascending=False)
+    sample_copy = get_sample_df().reset_index().sort_values("date", ascending=False)
     assert not util.is_sorted(sample_copy.date)
 
     # Define a helper to simplify writing slightly different versions of SAMEPLE_DF
@@ -34,7 +34,7 @@ def test_symbol_history_reader_and_writer(tmp_path):
 
         assert loaded_df.index.name == "date"
         assert util.is_sorted(loaded_df.index)
-        assert (loaded_df == SAMPLE_DF).all().all()
+        assert (loaded_df == get_sample_df()).all().all()
 
     for df in [sample_copy, sample_copy.set_index("date")]:
         check(stock_data.SymbolHistoryWriter(df))
@@ -45,11 +45,11 @@ def test_file_system_store(tmp_path):
     store = stock_data.FileSystemStore(tmp_path)
     assert not store.exists(symbol)
 
-    store.write("FOO", stock_data.SymbolHistoryWriter(SAMPLE_DF))
+    store.write("FOO", stock_data.SymbolHistoryWriter(get_sample_df()))
     assert store.exists("FOO")
 
     loaded_df = store.read(symbol, stock_data.SymbolHistoryReader())
-    assert (loaded_df == SAMPLE_DF).all().all()
+    assert (loaded_df == get_sample_df()).all().all()
 
 
 def test_check_cache_exists_path(tmp_path):

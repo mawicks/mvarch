@@ -7,7 +7,6 @@ from unittest.mock import patch
 # Local imports
 import mvarch.util as util
 import mvarch.stock_data as stock_data
-from tests.conftest import SAMPLE_DF
 
 SAMPLE_PATH = "any_path"
 

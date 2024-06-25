@@ -1,5 +1,12 @@
+from pathlib import Path
+from typing import Callable, Any
+
 import pytest
+
+import pandas as pd
+
 from mvarch.time_series_dataset import Dataset, TargetSelection, MultiSymbolDataset
+from mvarch import stock_data
 
 
 def test_dataset():
@@ -47,3 +54,20 @@ def test_target_selection():
 
     with pytest.raises(StopIteration):
         next(i)
+
+
+def test_multisymbol_dataset(
+    data_source: Callable[..., dict[Any, pd.DataFrame]], tmp_path: Path
+):
+    symbols = set(["ABC", "DEF"])
+
+    tmp_path_store = stock_data.FileSystemStore(str(tmp_path))
+    caching_download = stock_data.CachingDownloader(
+        data_source,
+        tmp_path_store,
+        stock_data.SymbolHistoryWriter,
+        overwrite_existing=False,
+    )
+
+    response = caching_download(symbols)
+    x = MultiSymbolDataset(response, context_size=6)
