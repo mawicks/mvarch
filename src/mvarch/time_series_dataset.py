@@ -78,7 +78,8 @@ class TargetSelection(torch.utils.data.Dataset):
 
 class MultiSymbolDataset(torch.utils.data.Dataset):
     def __init__(self, data: dict[str, pd.DataFrame], context_size=128):
-        self._symbol_encoding = {}
+        self._encoder = {}
+        self._decoder = []
 
         datasets = []
         for symbol_encoding, (symbol, symbol_history) in enumerate(data.items()):
@@ -88,7 +89,11 @@ class MultiSymbolDataset(torch.utils.data.Dataset):
                     encoded_symbol=symbol_encoding,
                 )
             )
-            self._symbol_encoding[symbol] = symbol_encoding
+            if symbol in self._encoder:
+                raise ValueError(f"{symbol} is duplicated")
+
+            self._encoder[symbol] = symbol_encoding
+            self._decoder.append(symbol)
         self._dataset = torch.utils.data.ConcatDataset(datasets)
 
     def __len__(self):
@@ -97,5 +102,8 @@ class MultiSymbolDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         return self._dataset[index]
 
-    def encoding(self):
-        return self._symbol_encoding
+    def encoder(self):
+        return self._encoder
+
+    def decoder(self):
+        return self._decoder
