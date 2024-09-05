@@ -9,11 +9,11 @@ from typing import Any, Callable, Dict, Iterator, Iterable, Tuple, Union
 import pandas as pd  # type: ignore
 
 # Local imports
-from . import data_sources
-from . import util
+from mvarch import data_sources
+from mvarch import util
 
-# Initialization
-logging.basicConfig(level=logging.INFO)
+
+logger = logging.getLogger(__file__)
 
 # This section defines the types that we will be using.
 
@@ -184,6 +184,7 @@ def CachingDownloader(
         # Handle the case where `symbol`is a single symbol
         symbols = util.to_symbol_list(symbols)
 
+        logger.info("Downloading...")
         if not overwrite_existing:
             # Determine what's missing
             missing = []

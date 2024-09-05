@@ -1,3 +1,9 @@
+import datetime as dt
+import logging
+from typing import Union
+
+logger = logging.getLogger(__name__)
+
 import pandas as pd
 import numpy as np
 import torch
@@ -60,40 +66,73 @@ class TargetSelection(torch.utils.data.Dataset):
     def __getitem__(self, index):
         t = self._time_series_dataset[index]
         if len(t.shape) == 1:
-            covariates = t[: -self._target_dim]
-            target = t[-self._target_dim :]
+            if self._target_dim > 0:
+                covariates = t[: -self._target_dim]
+                target = t[-self._target_dim :]
+            else:
+                covariates = t[:]
+                target = None
         else:
-            covariates = t[:, : -self._target_dim]
-            target = t[:, -self._target_dim :]
+            if self._target_dim > 0:
+                covariates = t[:, : -self._target_dim]
+                target = t[:, -self._target_dim :]
+            else:
+                covariates = t[:, :]
+                target = None
 
-        if self._symbol is None:
-            return {"covariates": covariates, "target": target}
-        else:
-            return {
-                "encoded_symbol": self._symbol,
-                "covariates": covariates,
-                "target": target,
-            }
+        result = {"covariates": covariates}
+        if self._target_dim > 0:
+            result["target"] = target
+        if self._symbol is not None:
+            result["encoded_symbol"] = self._symbol
+
+        return result
 
 
 class MultiSymbolDataset(torch.utils.data.Dataset):
-    def __init__(self, data: dict[str, pd.DataFrame], context_size=128):
-        self._encoder = {}
-        self._decoder = []
+    def __init__(
+        self,
+        data: dict[str, pd.DataFrame],
+        context_size=128,
+        target_dim=1,
+        start_date: Union[dt.date, None] = None,
+        end_date: Union[dt.date, None] = None,
+        encoder: Union[dict[str, int], None] = None,
+        decoder: Union[list[str], None] = None,
+    ):
+        if encoder is None:
+            self._encoder = {}
+        else:
+            self._encoder = encoder
+
+        if decoder is None:
+            self._decoder = []
+        else:
+            self._decoder = decoder
 
         datasets = []
-        for symbol_encoding, (symbol, symbol_history) in enumerate(data.items()):
-            datasets.append(
-                TargetSelection(
-                    Dataset(symbol_history["log_return"], context_size + 1),
-                    encoded_symbol=symbol_encoding,
-                )
-            )
-            if symbol in self._encoder:
-                raise ValueError(f"{symbol} is duplicated")
+        for symbol, symbol_history in data.items():
+            if symbol not in self._encoder:
+                self._encoder[symbol] = len(self._encoder)
+                self._decoder.append(symbol)
 
-            self._encoder[symbol] = symbol_encoding
-            self._decoder.append(symbol)
+            encoded_symbol = self._encoder[symbol]
+
+            dataset = symbol_history.loc[start_date:end_date, "log_return"]
+            if len(dataset) > 0:
+                datasets.append(
+                    TargetSelection(
+                        Dataset(
+                            dataset,
+                            context_size + target_dim,
+                        ),
+                        target_dim,
+                        encoded_symbol=encoded_symbol,
+                    )
+                )
+            else:
+                logger.warning(f"Symbol {symbol} has no data")
+
         self._dataset = torch.utils.data.ConcatDataset(datasets)
 
     def __len__(self):
@@ -107,3 +146,6 @@ class MultiSymbolDataset(torch.utils.data.Dataset):
 
     def decoder(self):
         return self._decoder
+
+    def symbol_count(self) -> int:
+        return len(self._encoder)

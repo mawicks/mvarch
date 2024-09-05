@@ -6,7 +6,7 @@ authors = ["Mark A Wicks <mawicks@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.8, <4"
+python = ">=3.9, <4"
 pandas = ">=1"
 torch = ">=1"
 yfinance = ">=0.1"
@@ -16,6 +16,8 @@ numpy = ">=1.22"
 urllib3 = ">=1.25"
 pylint = "^2.15.0"
 statsmodels = "^0.14.0"
+lightning = "^2.4.0"
+pyparsing = "^3.1.4"
 
 [tool.poetry.dev-dependencies]
 black = ">=22"
