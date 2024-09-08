@@ -19,7 +19,9 @@ from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 
 FAST = False
 BATCH_SIZE = 16
-DEFAULT_LR = 0.00002  # 0.0002  # 1e-4
+TRANSFORMER_LR = 0.00002  # 0.0002  # 1e-4
+CONVOLUTIONAL_LR = 0.0001
+DEFAULT_LR = CONVOLUTIONAL_LR
 TUNE_LR = False
 DATASET_SEQUENCE_LENGTH = 128
 MODEL_SEQUENCE_LENGTH = 128
@@ -81,7 +83,7 @@ class TrainingFixture(LightningModule):
         return self.model(x)
 
     def loss(self, batch):
-        output = self.model(batch)
+        output = self.model(**batch)
         target = torch.mean(batch["target"], dim=1)
         return self.loss_fn(output, target)
 
@@ -104,7 +106,6 @@ class TrainingFixture(LightningModule):
             threshold=1e-3,
             patience=3,
             cooldown=3,
-            verbose=True,
         )
         return {
             "optimizer": optimizer,
@@ -163,12 +164,6 @@ def run(
     end_date=None,
     eval_start_date=None,
     eval_end_date=None,
-    mean="zero",
-    univariate="arch",
-    multivariate="mvarch",
-    constraint="none",
-    distribution="normal",
-    device=device,
 ):
     # Rewrite symbols with deduped, uppercase versions
     symbols = list(map(str.upper, symbols))
@@ -186,11 +181,6 @@ def run(
     logging.debug(f"End date: {end_date}")
     logging.debug(f"Evaluation/termination start date: {eval_start_date}")
     logging.debug(f"Evaluation/termination end date: {eval_end_date}")
-    logging.debug(f"Mean model: {mean}")
-    logging.debug(f"Univariate model: {univariate}")
-    logging.debug(f"Multivariate model: {multivariate}")
-    logging.debug(f"Distribution: {distribution}")
-    logging.debug(f"Device: {device}")
 
     data_store = FileSystemStore("training_data")
     if use_hsmd:
@@ -224,16 +214,29 @@ def run(
         evaluation_data, batch_size=100 * BATCH_SIZE, num_workers=7
     )
 
-    model = models.Compose(
-        models.TimeSeriesTransformer(
-            sequence_length=MODEL_SEQUENCE_LENGTH,
-            symbol_count=training_data.symbol_count(),
-            embedding_size=LATENT_DIM,
-            num_layers=NUM_LAYERS,
-            num_heads=NUM_HEADS,
+    convolutional = models.Convolutional2(
+        sequence_length=MODEL_SEQUENCE_LENGTH,
+        embedding_size=LATENT_DIM,
+    )
+    transformer = models.TimeSeriesTransformer(
+        sequence_length=MODEL_SEQUENCE_LENGTH,
+        embedding_size=LATENT_DIM,
+        num_layers=NUM_LAYERS,
+        num_heads=NUM_HEADS,
+    )
+
+    embedding_model = transformer
+
+    if SYMBOL_EMBEDDING_SIZE > 0:
+        embedding_model = models.SymbolEmbeddings(
+            embedding_model,
+            symbol_count=len(symbols),
             symbol_embedding_size=SYMBOL_EMBEDDING_SIZE,
-        ),
-        models.NormalHead(latent_dim=LATENT_DIM, sigma_lower_bound=0.0001),
+            embedding_size=LATENT_DIM,
+        )
+
+    model = models.NormalHead(
+        embedding_model, latent_dim=LATENT_DIM, sigma_lower_bound=0.001
     )
 
     # model = models.Compose(models.SimpleLinear(sequence_length=MODEL_SEQUENCE_LENGTH), torch.nn.Identity())
@@ -321,46 +324,6 @@ def run(
     type=click.DateTime(formats=["%Y-%m-%d"]),
     help="Last date of data used for evaluation/termination",
 )
-@click.option(
-    "--mean",
-    type=click.Choice(["zero", "constant", "arma"], case_sensitive=False),
-    default="zero",
-    show_default=True,
-    help="Type of mean model to use",
-)
-@click.option(
-    "--univariate",
-    type=click.Choice(
-        ["arch", "none"],
-        case_sensitive=False,
-    ),
-    default="arch",
-    show_default=True,
-    help="Type of univariate model to use",
-)
-@click.option(
-    "--multivariate",
-    type=click.Choice(["mvarch", "none"], case_sensitive=False),
-    default="mvarch",
-    show_default=True,
-    help="Type of multivariate model to use (or 'none')",
-)
-@click.option(
-    "--constraint",
-    "-c",
-    type=click.Choice(
-        ["scalar", "diagonal", "triangular", "none"], case_sensitive=False
-    ),
-    default="diagonal",
-    help="Type of constraint to be applied to multivariate parameters.",
-)
-@click.option(
-    "--distribution",
-    "-d",
-    type=click.Choice(["normal", "studentt"], case_sensitive=False),
-    default="normal",
-    help="Error distribution to use.",
-)
 def main_cli(
     symbol,
     use_hsmd,
@@ -370,11 +333,6 @@ def main_cli(
     end_date,
     eval_start_date,
     eval_end_date,
-    mean,
-    univariate,
-    multivariate,
-    constraint,
-    distribution,
 ):
 
     if start_date:
@@ -389,10 +347,6 @@ def main_cli(
     if eval_end_date:
         eval_end_date = eval_end_date.date()
 
-    if univariate == "none" and multivariate == "none":
-        print("Univariate model and multivariate model cannot both be 'none'")
-        exit(1)
-
     run(
         use_hsmd,
         symbols=symbol,
@@ -402,12 +356,6 @@ def main_cli(
         end_date=end_date,
         eval_start_date=eval_start_date,
         eval_end_date=eval_end_date,
-        mean=mean,
-        univariate=univariate,
-        multivariate=multivariate,
-        constraint=constraint,
-        distribution=distribution,
-        device=device,
     )
 
 

@@ -33,6 +33,10 @@ import mvarch.deep_learning.models as models
 WINDOW_SIZE = 256
 MAX_ITERATIONS = 1_000
 LR = 0.25
+RUNS = 50
+PATIENCE = 50
+
+MODEL = "transformer-all-data.pkl"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,17 +76,82 @@ def run(
 ):
     # Rewrite symbols with deduped, uppercase versions
     symbols = list(map(str.upper, symbols))
-    symbols = ["SPY", "QQQ", "EDV", "TYD", "BND", "GLD", "NVDA"]
+    ira_symbols = [
+        "BND",
+        "EDV",
+        "FXG",
+        "FXL",
+        "GLD",
+        "QQQ",
+        "SPY",
+        "TYD",
+        "VBK",
+        "VNQ",
+        "XLV",
+        "XMVM",
+    ]
+    taxable_symbols = [
+        "BND",
+        "EDV",
+        "FXG",
+        "FXL",
+        "QQQ",
+        "SPY",
+        "TYD",
+        "VBK",
+        "VNQ",
+        "XLV",
+        "XMVM",
+    ]
+    other_symbols = ["BND", "EDV", "QQQ", "SPY", "TYD"]
+
+    test_symbols = [
+        "AAL",
+        "AAPL",
+        "AMZN",
+        "BA",
+        "BABA",
+        "BAC",
+        "BND",
+        "DIS",
+        "DG",
+        "EDV",
+        "F",
+        "FXG",
+        "GLD",
+        "GM",
+        "GME",
+        "IYF",
+        "IYR",
+        "KO",
+        "KR",
+        "NVDA",
+        "NFLX",
+        "NKE",
+        "PG",
+        "QLD",
+        "QQQ",
+        "SBUX",
+        "UGE",
+        "UPS",
+        "V",
+        "SPY",
+        "TYD",
+        "XLV",
+        "XLY",
+        "XMVM",
+        "XOM",
+    ]
+
+    symbols = ira_symbols
+
     refresh = False
 
     logging.debug(f"symbols: {symbols}")
     logging.debug(f"refresh: {refresh}")
 
-    loaded_object = torch.load("model.pkl")
+    loaded_object = torch.load(MODEL)
     encoder = loaded_object["encoder"]
-    for s in symbols:
-        if s not in encoder:
-            raise ValueError(f"{s} was not in training data.")
 
     model = loaded_object["model"]
     model.eval()
@@ -99,54 +168,18 @@ def run(
         history_loader, symbols, loaded_object["encoder"], loaded_object["decoder"]
     )
 
-    def get_optimal_allocation():
-        allocation = torch.randn(len(symbols), dtype=torch.float32)
-        # Need to set requires_grad outside of the randn() because the
-        # multiplications would make it a non-leaf tensor.
-        allocation.requires_grad = True
-        optim = torch.optim.Adam(params=[allocation], lr=LR, maximize=True)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optim, mode="max", factor=0.5, patience=20
-        )
-        best_perf = -float("inf")
-        for iteration, _ in enumerate(range(MAX_ITERATIONS)):
-            optim.zero_grad()
-
-            portfolio_returns = proper_get_portfolio_returns(
-                historical_returns, allocation
-            )
-
-            batch = {
-                "covariates": portfolio_returns.unsqueeze(0),
-                "encoded_symbol": None,
-            }
-            mu, sigma = model(batch)[0]
-            performance = 250 * (mu - 0.25 * sigma)
-
-            if float(performance) > best_perf:
-                best_perf = float(performance)
-                best_iteration = iteration
-                best_allocation = torch.softmax(allocation.detach(), 0)
-
-            if iteration - best_iteration > 50:
-                break
-
-            performance.backward()
-            optim.step()
-
-            scheduler.step(performance)
-            if iteration % 10 == 0:
-                print(
-                    f"{iteration}) lr: {scheduler.get_last_lr()} mu: {250.0*float(mu):0.4f}, perf: {float(performance):0.4f}"
-                )
-
-        print(f"best perf: {best_perf:.4f} at iter {best_iteration}")
-        print(f"best allocation: {best_allocation}")
-        return best_allocation
+    batch = {
+        "covariates": historical_returns.permute((1, 0)),
+        "encoded_symbol": None,
+    }
+    mus, sigmas = model(batch).unbind(1)
+    for symbol, mu, sigma in zip(symbols, mus, sigmas):
+        ratio = mu / sigma
+        print(f"{symbol:>5s}  mu: {250*mu:6.3f}  ratio: {ratio:6.3f}")
 
     allocations = []
-    for i in range(100):
-        allocations.append(get_optimal_allocation())
+    for i in range(RUNS):
+        allocations.append(get_optimal_allocation(symbols, historical_returns, model))
 
     mean_allocation = torch.mean(torch.stack(allocations, dim=0), dim=0)
 
@@ -157,6 +190,54 @@ def run(
     print(f"mean: {mean_allocation}")
 
     print(f"symbols: {symbols}")
+
+
+def get_optimal_allocation(symbols, historical_returns, model):
+    allocation = torch.randn(len(symbols), dtype=torch.float32)
+    # Need to set requires_grad outside of the randn() because the
+    # multiplications would make it a non-leaf tensor.
+    allocation.requires_grad = True
+    optim = torch.optim.Adam(params=[allocation], lr=LR, maximize=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optim, mode="max", factor=0.5, patience=20
+    )
+    best_perf = -float("inf")
+    best_mu = best_sigma = None
+
+    for iteration, _ in enumerate(range(MAX_ITERATIONS)):
+        optim.zero_grad()
+
+        portfolio_returns = proper_get_portfolio_returns(historical_returns, allocation)
+
+        batch = {
+            "covariates": portfolio_returns.unsqueeze(0),
+            "encoded_symbol": None,
+        }
+        mu, sigma = model(batch)[0]
+        performance = 250 * (mu - 0.25 * sigma)
+
+        if float(performance) > best_perf:
+            best_perf = float(performance)
+            best_iteration = iteration
+            best_allocation = torch.softmax(allocation.detach(), 0)
+            best_mu = float(mu)
+            best_sigma = float(sigma)
+
+        if iteration - best_iteration >= PATIENCE:
+            break
+
+        scheduler.step(performance)
+        performance.backward()
+        optim.step()
+
+        if iteration % 10 == 0:
+            print(
+                f"{iteration}) lr:{scheduler.get_last_lr()} mu:{250.0*float(mu):.3f} sigma:{250.0*float(sigma):.3f} ratio:{float(mu/sigma):.3f} perf:{float(performance):0.4f}"
+            )
+
+    print(f"best perf: {best_perf:.4f} at iter {best_iteration}")
+    print(f"best allocation: {best_allocation}")
+    return best_allocation
 
 
 def simple_get_portfolio_returns(historical_returns, allocation):

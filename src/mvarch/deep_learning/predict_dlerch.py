@@ -67,15 +67,52 @@ def run(
     # Rewrite symbols with deduped, uppercase versions
     symbols = list(map(str.upper, symbols))
     symbols = ["SPY", "QQQ", "EDV", "TYD", "BND", "GLD", "NVDA"]
+    symbols = [
+        "AAL",
+        "AAPL",
+        "AMZN",
+        "BA",
+        "BABA",
+        "BAC",
+        "BND",
+        "DIS",
+        "DG",
+        "EDV",
+        "F",
+        "FXG",
+        "GLD",
+        "GM",
+        "GME",
+        "IYF",
+        "IYR",
+        "KO",
+        "KR",
+        "NVDA",
+        "NFLX",
+        "NKE",
+        "PG",
+        "QLD",
+        "QQQ",
+        "SBUX",
+        "UGE",
+        "UPS",
+        "V",
+        "SPY",
+        "TYD",
+        "XLV",
+        "XLY",
+        "XMVM",
+        "XOM",
+    ]
 
     logging.debug(f"symbols: {symbols}")
     logging.debug(f"refresh: {refresh}")
 
     loaded_object = torch.load("model.pkl")
     encoder = loaded_object["encoder"]
-    for s in symbols:
-        if s not in encoder:
-            raise ValueError(f"{s} was not in training data.")
+    # for s in symbols:
+    #     if s not in encoder:
+    #         raise ValueError(f"{s} was not in training data.")
 
     model = loaded_object["model"]
     model.eval()

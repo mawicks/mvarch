@@ -5,7 +5,7 @@ import pytest
 from mvarch.deep_learning import models
 
 BATCH_SIZE = 2
-CONTEXT_SIZE = 64
+CONTEXT_SIZE = 128
 EMBEDDING_SIZE = 6
 
 
@@ -26,18 +26,30 @@ def test_simple_timeseries_emedding(batch):
     assert embedding.shape == (BATCH_SIZE, EMBEDDING_SIZE)
 
 
-def test_time_series_transformer(batch):
+def test_time_series_embeddings(batch):
     print(batch)
-    model = models.TimeSeriesTransformer(
-        sequence_length=64, symbol_count=2, embedding_size=EMBEDDING_SIZE, num_heads=2
-    )
-    embedding = model.forward(**batch)
-    assert embedding.shape == (BATCH_SIZE, EMBEDDING_SIZE)
+    for Model in (models.TimeSeriesTransformer,):
+        model = Model(sequence_length=64, embedding_size=EMBEDDING_SIZE, num_heads=2)
+        embedding = model.forward(**batch)
+        assert embedding.shape == (BATCH_SIZE, EMBEDDING_SIZE)
 
 
-def test_normal_head():
+def test_convolutional(batch):
+    for Model in (models.Convolutional, models.Convolutional2):
+        print(batch)
+        model = Model(sequence_length=128, embedding_size=EMBEDDING_SIZE)
+        embedding = model.forward(**batch)
+        assert embedding.shape == (BATCH_SIZE, EMBEDDING_SIZE)
+
+
+def test_normal_head(batch):
     latents = torch.randn(BATCH_SIZE, EMBEDDING_SIZE)
-    model = models.NormalHead(latent_dim=EMBEDDING_SIZE)
-    output = model.forward(latents)
+    embedding_model = models.TimeSeriesTransformer(
+        sequence_length=64, embedding_size=EMBEDDING_SIZE, num_heads=2
+    )
+    model = models.NormalHead(
+        embedding_model=embedding_model, latent_dim=EMBEDDING_SIZE
+    )
+    output = model.forward(**batch)
     assert output.shape == (BATCH_SIZE, 2)
     assert all(output[:, 1] > 0)
