@@ -24,6 +24,10 @@ TUNE_LR = False
 DATASET_SEQUENCE_LENGTH = 128
 MODEL_SEQUENCE_LENGTH = 128
 SYMBOL_EMBEDDING_SIZE = 0
+NUM_LAYERS = 4
+NUM_HEADS = 4
+# Note: LATENT_DIM must be divisible by NUM_HEADS
+LATENT_DIM = 64
 
 # Local modules
 from mvarch.data_sources import HugeStockMarketDatasetSource, YFinanceSource
@@ -210,24 +214,29 @@ def run(
     logging.debug(f"Symbol count: {evaluation_data.symbol_count()}")
 
     train_loader = torch.utils.data.DataLoader(
-        training_data, batch_size=BATCH_SIZE, shuffle=True
+        training_data,
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        num_workers=4,
+        persistent_workers=True,
     )
     eval_loader = torch.utils.data.DataLoader(
-        evaluation_data, batch_size=100 * BATCH_SIZE
+        evaluation_data, batch_size=100 * BATCH_SIZE, num_workers=7
     )
 
     model = models.Compose(
         models.TimeSeriesTransformer(
             sequence_length=MODEL_SEQUENCE_LENGTH,
             symbol_count=training_data.symbol_count(),
-            embedding_size=64,
-            num_layers=4,
+            embedding_size=LATENT_DIM,
+            num_layers=NUM_LAYERS,
+            num_heads=NUM_HEADS,
             symbol_embedding_size=SYMBOL_EMBEDDING_SIZE,
         ),
-        models.NormalHead(latent_dim=64, sigma_lower_bound=0.0001),
+        models.NormalHead(latent_dim=LATENT_DIM, sigma_lower_bound=0.0001),
     )
 
-    # model = models.Compose(models.SimpleLinear(sequence_length=64), torch.nn.Identity())
+    # model = models.Compose(models.SimpleLinear(sequence_length=MODEL_SEQUENCE_LENGTH), torch.nn.Identity())
 
     training_fixture = TrainingFixture(model)
 
