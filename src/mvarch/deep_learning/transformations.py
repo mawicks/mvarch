@@ -1,10 +1,10 @@
 import torch
 
 
-def simple_get_portfolio_backwards_returns(allocations, historical_returns):
+def simple_get_portfolio_returns(allocations, historical_returns):
     """Use a simple linear formula to approximate the historical log-returns
     of a portfolio, given the historical log-returns of each asset in
-    the portfolio.
+    the portfolio.  It's an approximate that works forward or backward.
 
     Arguments:
         historical_returns: shape of (number_of_symbols, sequence_size)
@@ -18,15 +18,15 @@ def simple_get_portfolio_backwards_returns(allocations, historical_returns):
     return torch.softmax(allocations, 1) @ historical_returns
 
 
-def proper_get_portfolio_backwards_returns(
-    allocations: torch.Tensor, historical_returns: torch.Tensor
+def proper_get_portfolio_returns(
+    allocations: torch.Tensor, historical_returns: torch.Tensor, reverse=False
 ):
     """Use a more complex formula to get the historical log-returns of a portfolio,
     given the historical log-returns of each asset int the portfolio.
-    Assume the portfolio allocation is chosen today, then back-propogate
-    the returns of each asset in the portfolio to get the historical
-    asset values. Add then together in the value space rather then in
-    the log-return space.
+    Assume the portfolio allocation is chosen today, then forward (or
+    backward) propogate the returns of each asset in the portfolio to
+    get the historical asset values. Add them together in the value
+    space rather then in the log-return space.
 
     Arguments:
         allocations: shape of (allocation_batch_size, number_of_symbols)
@@ -48,9 +48,11 @@ def proper_get_portfolio_backwards_returns(
     log_allocation = torch.log_softmax(allocations, 1)
     # Accumulate the log returns in the reverse direction (flip the
     # order along the time dimension which is 1, and flip the sign)
-    reversed_cumulative_log_returns = -torch.cumsum(
-        torch.flip(historical_returns, [1]), 1
-    )
+
+    if reverse:
+        historical_returns = -torch.flip(historical_returns, [1])
+
+    cumulative_log_returns = torch.cumsum(historical_returns, 1)
 
     # The allocations are log allocations and the returns are log
     # returns, so each log allocation will be added to cumulative log
@@ -71,23 +73,24 @@ def proper_get_portfolio_backwards_returns(
     # Similiarly replicate the cumulative log returns for allocation
     # along the allocation batch (allocation_batch_size):
 
-    reversed_cumulative_log_returns = reversed_cumulative_log_returns.unsqueeze(
-        0
-    ).expand(*desired_shape)
+    cumulative_log_returns = cumulative_log_returns.unsqueeze(0).expand(*desired_shape)
 
     cumulative_reversed_portfolio_log_returns = torch.logsumexp(
-        log_allocation + reversed_cumulative_log_returns, dim=1
+        log_allocation + cumulative_log_returns, dim=1
     )
 
     # Now flip again, append zeros, and diff:
-
-    x = torch.diff(
+    result = torch.diff(
         torch.concat(
             [
-                torch.flip(cumulative_reversed_portfolio_log_returns, [1]),
                 torch.zeros(allocation_batch_size, 1),
+                cumulative_reversed_portfolio_log_returns,
             ],
             dim=1,
         )
     )
-    return x
+
+    if reverse:
+        result = -torch.flip(result, [1])
+
+    return result
