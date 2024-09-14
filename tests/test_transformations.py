@@ -27,3 +27,12 @@ def test_proper_portfolio_backward_returns():
     result = proper_get_portfolio_backwards_returns(allocations, historical_returns)
 
     assert result.shape == (ALLOCATION_BATCHES, SEQUENCE_LENGTH)
+
+    error = torch.max(torch.abs(comparison - result))
+
+    # The upper limit for the error hasn't been determined rigorously.
+    # It's just a check that the error is somewhat small compared to the
+    # typical daily return. It should catch gross errors, but certainly
+    # not all errors.
+
+    assert float(error) < 0.0005
