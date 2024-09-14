@@ -21,7 +21,7 @@ FAST = False
 BATCH_SIZE = 16
 TRANSFORMER_LR = 0.00002  # 0.0002  # 1e-4
 CONVOLUTIONAL_LR = 0.0001
-DEFAULT_LR = CONVOLUTIONAL_LR
+DEFAULT_LR = TRANSFORMER_LR
 TUNE_LR = False
 DATASET_SEQUENCE_LENGTH = 128
 MODEL_SEQUENCE_LENGTH = 128
@@ -29,7 +29,7 @@ SYMBOL_EMBEDDING_SIZE = 0
 NUM_LAYERS = 4
 NUM_HEADS = 4
 # Note: LATENT_DIM must be divisible by NUM_HEADS
-LATENT_DIM = 64
+LATENT_DIM = 96
 
 # Local modules
 from mvarch.data_sources import HugeStockMarketDatasetSource, YFinanceSource
@@ -91,6 +91,8 @@ class TrainingFixture(LightningModule):
         return self.loss(batch)
 
     def validation_step(self, batch, batch_idx):
+
+        l
         loss = self.loss(batch)
         self.log("val_loss", loss)
         return loss

@@ -11,12 +11,6 @@ import pandas as pd  # type: ignore
 import torch
 import torch.utils
 import torch.utils.data
-from lightning import LightningModule  # , LightningDataModule
-from lightning.pytorch.tuner.tuning import Tuner
-from lightning.pytorch.trainer.trainer import Trainer
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 
 # Local modules
 from mvarch.data_sources import HugeStockMarketDatasetSource, YFinanceSource
@@ -26,9 +20,6 @@ from mvarch.stock_data import (
     PriceHistoryConcatenator,
 )
 
-from mvarch.time_series_dataset import MultiSymbolDataset
-
-import mvarch.deep_learning.models as models
 
 WINDOW_SIZE = 256
 MAX_ITERATIONS = 1_000
@@ -50,8 +41,6 @@ def prepare_data(
         [Union[str, Iterable[str]]], Iterator[Tuple[str, pd.DataFrame]]
     ],
     symbol_list: Iterable[str],
-    encoder: dict[str, int],
-    decoder: list[str],
 ):
     end_date = dt.date.today()
     start_date = end_date - dt.timedelta(days=192)
@@ -151,7 +140,6 @@ def run(
     logging.debug(f"refresh: {refresh}")
 
     loaded_object = torch.load(MODEL)
-    encoder = loaded_object["encoder"]
 
     model = loaded_object["model"]
     model.eval()
@@ -164,9 +152,7 @@ def run(
 
     history_loader = CachingSymbolHistoryLoader(data_source, data_store, refresh)
 
-    historical_returns = prepare_data(
-        history_loader, symbols, loaded_object["encoder"], loaded_object["decoder"]
-    )
+    historical_returns = prepare_data(history_loader, symbols)
 
     batch = {
         "covariates": historical_returns.permute((1, 0)),
