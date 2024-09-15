@@ -12,6 +12,7 @@ from mvarch.time_series_dataset import (
     TargetSelection,
     MultiSymbolDataset,
     PortfolioDataset,
+    RandomPortfolioDataset,
 )
 from mvarch import stock_data
 
@@ -222,41 +223,52 @@ def test_portfolio_dataset_record_shapes(portfolio_dataset):
     record = portfolio_dataset[0]
     assert record["window"].shape == (2, 2)
     assert record["target"].shape == (1, 2)
-    assert record["symbol_encoding"].shape == (2,)
+    assert record["encoded_symbol"].shape == (2,)
 
 
 def test_portfolio_dataset_record_window_values(portfolio_dataset):
     record = portfolio_dataset[0]
     assert np.all(record["window"].numpy() == np.array([[0, 1], [6, 7]]))
     assert np.all(record["target"].numpy() == np.array([[12, 13]]))
-    assert np.all(record["symbol_encoding"].numpy() == np.array([0, 1]))
+    assert np.all(record["encoded_symbol"].numpy() == np.array([0, 1]))
 
     record = portfolio_dataset[1]
     assert np.all(record["window"].numpy() == np.array([[2, 3], [8, 9]]))
     assert np.all(record["target"].numpy() == np.array([[14, 15]]))
-    assert np.all(record["symbol_encoding"].numpy() == np.array([2, 3]))
+    assert np.all(record["encoded_symbol"].numpy() == np.array([2, 3]))
 
     record = portfolio_dataset[2]
     assert np.all(record["window"].numpy() == np.array([[4, 5], [10, 11]]))
     assert np.all(record["target"].numpy() == np.array([[16, 17]]))
-    assert np.all(record["symbol_encoding"].numpy() == np.array([4, 5]))
+    assert np.all(record["encoded_symbol"].numpy() == np.array([4, 5]))
 
     record = portfolio_dataset[3]
     assert np.all(record["window"].numpy() == np.array([[6, 7], [12, 13]]))
     assert np.all(record["target"].numpy() == np.array([[18, 19]]))
-    assert np.all(record["symbol_encoding"].numpy() == np.array([0, 1]))
+    assert np.all(record["encoded_symbol"].numpy() == np.array([0, 1]))
 
     record = portfolio_dataset[4]
     assert np.all(record["window"].numpy() == np.array([[8, 9], [14, 15]]))
     assert np.all(record["target"].numpy() == np.array([[20, 21]]))
-    assert np.all(record["symbol_encoding"].numpy() == np.array([2, 3]))
+    assert np.all(record["encoded_symbol"].numpy() == np.array([2, 3]))
 
     record = portfolio_dataset[5]
     assert np.all(record["window"].numpy() == np.array([[10, 11], [16, 17]]))
     assert np.all(record["target"].numpy() == np.array([[22, 23]]))
-    assert np.all(record["symbol_encoding"].numpy() == np.array([4, 5]))
+    assert np.all(record["encoded_symbol"].numpy() == np.array([4, 5]))
 
 
 def test_portfolio_dataset_randomize_portfolios(portfolio_dataset):
     portfolio_dataset.randomize_portfolios()
     pass
+
+
+def test_random_portfolio_dataset(portfolio_dataset):
+    random_portfolio_dataset = RandomPortfolioDataset(portfolio_dataset)
+    # All we're checking here is that the call executes, not whether it
+    # actually does anything.
+    random_portfolio_dataset.randomize_portfolios()
+    record = random_portfolio_dataset[0]
+    assert record["window"].shape == (2,)
+    assert record["target"].shape == (1,)
+    assert record["encoded_symbol"] == None

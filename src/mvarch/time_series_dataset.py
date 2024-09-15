@@ -10,6 +10,11 @@ import numpy as np
 import torch
 import torch.utils.data
 
+from mvarch.deep_learning.transformations import (
+    proper_get_portfolio_returns,
+    random_allocation,
+)
+
 
 class Dataset(torch.utils.data.Dataset):
     """DataSet subclass for time series.
@@ -175,6 +180,9 @@ class PortfolioDataset(torch.utils.data.Dataset):
     randomize the composition of the portfolios for that purpose.  For
     that purpose, a randomize_portfolios() call changes the composition
     of the portfolios.
+
+    Betwen calls to randomize_portfolios() the values returned by
+    __getitem__() are deterministic.
     """
 
     def __init__(self, data, window_dim, portfolio_dim, target_dim, symbols: list[str]):
@@ -193,7 +201,7 @@ class PortfolioDataset(torch.utils.data.Dataset):
             .unsqueeze(0)
             .expand(len(dataset), self._num_portfolios, self._portfolio_dim)
         )
-        self._symbol_encoding = np.array(range(len(symbols)))
+        self._encoded_symbol = np.array(range(len(symbols)))
 
     def randomize_portfolios(self):
         """
@@ -201,8 +209,12 @@ class PortfolioDataset(torch.utils.data.Dataset):
         portfolios.  This might typically be called at the beginning of
         each training epoch.  Shuffling the indexes in the call to
         __item__(), which would be performed by the dataloaders, will
-        not shuffle the assignment of symbols to portfolios.  This method
-        is necessary to do that.
+        not shuffle the assignment of symbols to portfolios.  This
+        method is necessary to do that.
+
+        Betwen calls to randomize_portfolios(), the values returned by
+        __getitem__() are deterministic
+
         """
         portfolios = [
             list(range(len(self._symbols))) for _ in range(len(self._dataset))
@@ -233,5 +245,39 @@ class PortfolioDataset(torch.utils.data.Dataset):
         return {
             "window": portfolio_window,
             "target": portfolio_target,
-            "symbol_encoding": portfolio_encoding,
+            "encoded_symbol": portfolio_encoding,
         }
+
+
+class RandomPortfolioDataset(torch.utils.data.Dataset):
+    """
+    This is a wrapper around PortfolioDataset that generates the time
+    series that would be achieved by choosing a random allocation of
+    assets in that portfolio.  The randomization occurs on each call to
+    __getitem__().
+    """
+
+    def __init__(self, portfolio_dataset: PortfolioDataset):
+        self._portfolio_dataset = portfolio_dataset
+
+    def __getitem__(self, index):
+        portfolio = self._portfolio_dataset[index]
+        window = portfolio["window"]
+        target = portfolio["target"]
+
+        allocation = random_allocation(1, window.shape[1])
+        aggregate_window = proper_get_portfolio_returns(
+            allocation, window, reverse=True
+        ).squeeze(0)
+        aggregate_target = proper_get_portfolio_returns(
+            allocation, target, reverse=False
+        ).squeeze(0)
+        return {
+            "window": aggregate_window,
+            "target": aggregate_target,
+            "encoded_symbol": None,
+        }
+
+    def randomize_portfolios(self):
+        """Call randomize_portfolios on the underlying PortfolioDataset"""
+        self._portfolio_dataset.randomize_portfolios()
