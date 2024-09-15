@@ -7,15 +7,15 @@ def simple_get_portfolio_returns(allocations, historical_returns):
     the portfolio.  It's an approximate that works forward or backward.
 
     Arguments:
-        historical_returns: shape of (number_of_symbols, sequence_size)
         allocation: shape of (allocation_batch_size, number_of_symbols)
+        historical_returns: shape of (sequence_size, number_of_symbols)
 
     Returns:
         shape of (allocation_batch_size, sequence_size)
 
     """
 
-    return torch.softmax(allocations, 1) @ historical_returns
+    return torch.softmax(allocations, 1) @ historical_returns.T
 
 
 def proper_get_portfolio_returns(
@@ -30,7 +30,7 @@ def proper_get_portfolio_returns(
 
     Arguments:
         allocations: shape of (allocation_batch_size, number_of_symbols)
-        historical_returns: shape of (number_of_symbols, sequence_size)
+        historical_returns: shape of (sequence_size, number_of_symbols)
 
     Returns:
         shape of (allocation_batch_size, sequence_size)
@@ -38,7 +38,7 @@ def proper_get_portfolio_returns(
 
     """
     allocation_batch_size, number_of_symbols = allocations.shape
-    _, sequence_size = historical_returns.shape
+    sequence_size, _ = historical_returns.shape
 
     if _ != number_of_symbols:
         raise ValueError(
@@ -50,9 +50,9 @@ def proper_get_portfolio_returns(
     # order along the time dimension which is 1, and flip the sign)
 
     if reverse:
-        historical_returns = -torch.flip(historical_returns, [1])
+        historical_returns = -torch.flip(historical_returns, [0])
 
-    cumulative_log_returns = torch.cumsum(historical_returns, 1)
+    cumulative_log_returns = torch.cumsum(historical_returns, 0)
 
     # The allocations are log allocations and the returns are log
     # returns, so each log allocation will be added to cumulative log
@@ -66,17 +66,17 @@ def proper_get_portfolio_returns(
     # First, expand the allocation along the time dimension (sequence_size)
     # Do this by calling unsqueeze() to get a time dimension, then
     # expand() the time dimension.
-    desired_shape = (allocation_batch_size, number_of_symbols, sequence_size)
+    desired_shape = (allocation_batch_size, sequence_size, number_of_symbols)
 
-    log_allocation = log_allocation.unsqueeze(2).expand(*desired_shape)
+    log_allocation = log_allocation.unsqueeze(1).expand(*desired_shape)
 
     # Similiarly replicate the cumulative log returns for allocation
     # along the allocation batch (allocation_batch_size):
 
     cumulative_log_returns = cumulative_log_returns.unsqueeze(0).expand(*desired_shape)
 
-    cumulative_reversed_portfolio_log_returns = torch.logsumexp(
-        log_allocation + cumulative_log_returns, dim=1
+    cumulative_portfolio_log_returns = torch.logsumexp(
+        log_allocation + cumulative_log_returns, dim=2
     )
 
     # Now flip again, append zeros, and diff:
@@ -84,7 +84,7 @@ def proper_get_portfolio_returns(
         torch.concat(
             [
                 torch.zeros(allocation_batch_size, 1),
-                cumulative_reversed_portfolio_log_returns,
+                cumulative_portfolio_log_returns,
             ],
             dim=1,
         )
