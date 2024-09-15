@@ -255,3 +255,8 @@ def test_portfolio_dataset_record_window_values(portfolio_dataset):
     assert np.all(record["window"].numpy() == np.array([[10, 11], [16, 17]]))
     assert np.all(record["target"].numpy() == np.array([[22, 23]]))
     assert np.all(record["symbol_encoding"].numpy() == np.array([4, 5]))
+
+
+def test_portfolio_dataset_randomize_portfolios(portfolio_dataset):
+    portfolio_dataset.randomize_portfolios()
+    pass

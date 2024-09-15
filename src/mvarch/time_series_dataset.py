@@ -1,5 +1,6 @@
 import datetime as dt
 import logging
+import random
 from typing import Union
 
 logger = logging.getLogger(__name__)
@@ -154,6 +155,28 @@ class MultiSymbolDataset(torch.utils.data.Dataset):
 
 
 class PortfolioDataset(torch.utils.data.Dataset):
+    """
+    This is a dataset where each item is a portfolio of time series.
+    The portfolio is a subset of all symbols in the dataset of size
+    `portfolio_dim`.
+
+    The index is ordered so that the first time index and the first
+    portfolio correspond to index 0.  The first time index and the
+    second portfolio correspond to index 1, and so on until all
+    of the portfolios at the lowest time index have been returned.
+
+    Initially, the portfolios are composed from symbols in order, i.e.,
+    the portfolio 0 consists of symbols[0:portfolio_dim], etc.  The
+    portfolios can be any partition of symbols and can be set
+    differently for each time step.  Intially they are all the same.
+
+    This dataset will likely be used with a dataloader that allows the
+    index to be shuffled.  Shuffling the index on each epoch won't
+    randomize the composition of the portfolios for that purpose.  For
+    that purpose, a randomize_portfolios() call changes the composition
+    of the portfolios.
+    """
+
     def __init__(self, data, window_dim, portfolio_dim, target_dim, symbols: list[str]):
         dataset = Dataset(data, window_dim + target_dim, stride=1)
         self._dataset = TargetSelection(dataset, target_dim)
@@ -164,10 +187,32 @@ class PortfolioDataset(torch.utils.data.Dataset):
                 f"Number of symbols {len(symbols)} must be divisible by portfolio dimension ({portfolio_dim})"
             )
         self._num_portfolios = len(symbols) // portfolio_dim
-        self._portfolios = np.array(range(len(symbols))).reshape(
-            self._num_portfolios, -1
+        self._portfolios = (
+            torch.tensor(range(len(symbols)))
+            .reshape(self._num_portfolios, -1)
+            .unsqueeze(0)
+            .expand(len(dataset), self._num_portfolios, self._portfolio_dim)
         )
         self._symbol_encoding = np.array(range(len(symbols)))
+
+    def randomize_portfolios(self):
+        """
+        Call this when you want to change the assignment of symbols to
+        portfolios.  This might typically be called at the beginning of
+        each training epoch.  Shuffling the indexes in the call to
+        __item__(), which would be performed by the dataloaders, will
+        not shuffle the assignment of symbols to portfolios.  This method
+        is necessary to do that.
+        """
+        portfolios = [
+            list(range(len(self._symbols))) for _ in range(len(self._dataset))
+        ]
+        for p in portfolios:
+            random.shuffle(p)
+
+        self._portfolios = torch.tensor(portfolios).reshape(
+            len(self._dataset), self._num_portfolios, self._portfolio_dim
+        )
 
     def __len__(self):
         return len(self._dataset) * self._num_portfolios
@@ -180,12 +225,10 @@ class PortfolioDataset(torch.utils.data.Dataset):
         window = time_series["window"]
         target = time_series["target"]
 
-        portfolio = self._portfolios[portfolio_index]
+        portfolio = self._portfolios[time_series_index][portfolio_index]
         portfolio_window = window[:, portfolio]
         portfolio_target = target[:, portfolio]
-        portfolio_encoding = torch.tensor(
-            self._symbol_encoding[portfolio], dtype=torch.int32
-        )
+        portfolio_encoding = portfolio
 
         return {
             "window": portfolio_window,
