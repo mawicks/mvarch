@@ -13,7 +13,7 @@ EMBEDDING_SIZE = 6
 def batch():
     generator = torch.random.manual_seed(42)
     return {
-        "covariates": torch.randn((BATCH_SIZE, CONTEXT_SIZE), generator=generator),
+        "window": torch.randn((BATCH_SIZE, CONTEXT_SIZE), generator=generator),
         "encoded_symbol": torch.randint(0, 2, (BATCH_SIZE,), generator=generator),
         "target": torch.randn((BATCH_SIZE), generator=generator),
     }

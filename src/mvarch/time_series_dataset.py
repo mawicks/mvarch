@@ -11,7 +11,15 @@ import torch.utils.data
 
 
 class Dataset(torch.utils.data.Dataset):
-    """DataSet subclass for time series"""
+    """DataSet subclass for time series.
+    If the time series is multi-dimensional, this Dataset assumes that
+    time is the first dimension.  This is consistent with the dimension
+    order used in RNNS, and transformer models, but *not* the convention
+    best suited for 1-d convolutional networks where the time dimension
+    comes last.  Because we're breaking time up into windows,  it's
+    easier if time is the first dimension and we can ignore any other
+    dimensions.
+    """
 
     def __init__(self, series, sequence_length, stride=1):
         if stride <= 0:
@@ -23,7 +31,8 @@ class Dataset(torch.utils.data.Dataset):
 
         self._sequence_length = sequence_length
         self._stride = stride
-        self._length = (len(self._series) - sequence_length) // stride + 1
+
+        self._length = (self._series.shape[0] - sequence_length) // stride + 1
 
     def __len__(self):
         return self._length
@@ -37,16 +46,17 @@ class Dataset(torch.utils.data.Dataset):
             result = torch.tensor(
                 self._series[start : start + self._sequence_length], dtype=torch.float
             )
-            if len(result.shape) == 1:
-                return result
-            else:
-                return result.t()
+            return result
         else:
             raise IndexError()
 
 
 class TargetSelection(torch.utils.data.Dataset):
-    """Split time series slices into covariates and target"""
+    """Split time series slices into window and target
+
+    The order of the dimensions follows the convention described above
+    in the Dataset class of this module.
+    """
 
     def __init__(self, time_series_dataset, target_dim=1, encoded_symbol=None):
         """Generally, the stride used to construct Dataset should be equal to
@@ -65,22 +75,14 @@ class TargetSelection(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         t = self._time_series_dataset[index]
-        if len(t.shape) == 1:
-            if self._target_dim > 0:
-                covariates = t[: -self._target_dim]
-                target = t[-self._target_dim :]
-            else:
-                covariates = t[:]
-                target = None
+        if self._target_dim > 0:
+            window = t[: -self._target_dim]
+            target = t[-self._target_dim :]
         else:
-            if self._target_dim > 0:
-                covariates = t[:, : -self._target_dim]
-                target = t[:, -self._target_dim :]
-            else:
-                covariates = t[:, :]
-                target = None
+            window = t[:]
+            target = None
 
-        result = {"covariates": covariates}
+        result = {"window": window}
         if self._target_dim > 0:
             result["target"] = target
         if self._symbol is not None:
@@ -149,3 +151,44 @@ class MultiSymbolDataset(torch.utils.data.Dataset):
 
     def symbol_count(self) -> int:
         return len(self._encoder)
+
+
+class PortfolioDataset(torch.utils.data.Dataset):
+    def __init__(self, data, window_dim, portfolio_dim, target_dim, symbols: list[str]):
+        dataset = Dataset(data, window_dim + target_dim, stride=1)
+        self._dataset = TargetSelection(dataset, target_dim)
+        self._symbols = symbols
+        self._portfolio_dim = portfolio_dim
+        if len(symbols) % portfolio_dim != 0:
+            raise ValueError(
+                f"Number of symbols {len(symbols)} must be divisible by portfolio dimension ({portfolio_dim})"
+            )
+        self._num_portfolios = len(symbols) // portfolio_dim
+        self._portfolios = np.array(range(len(symbols))).reshape(
+            self._num_portfolios, -1
+        )
+        self._symbol_encoding = np.array(range(len(symbols)))
+
+    def __len__(self):
+        return len(self._dataset) * self._num_portfolios
+
+    def __getitem__(self, index):
+        time_series_index = index // self._num_portfolios
+        portfolio_index = index % self._num_portfolios
+
+        time_series = self._dataset[time_series_index]
+        window = time_series["window"]
+        target = time_series["target"]
+
+        portfolio = self._portfolios[portfolio_index]
+        portfolio_window = window[:, portfolio]
+        portfolio_target = target[:, portfolio]
+        portfolio_encoding = torch.tensor(
+            self._symbol_encoding[portfolio], dtype=torch.int32
+        )
+
+        return {
+            "window": portfolio_window,
+            "target": portfolio_target,
+            "symbol_encoding": portfolio_encoding,
+        }

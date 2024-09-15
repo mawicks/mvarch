@@ -7,8 +7,8 @@ class SimpleTimeSeriesEmbedding(torch.nn.Module):
         self._embedding_size = embedding_size
         return
 
-    def forward(self, *, covariates: torch.Tensor, **kwargs):
-        batch_size = covariates.shape[0]
+    def forward(self, *, window: torch.Tensor, **kwargs):
+        batch_size = window.shape[0]
         return torch.randn(batch_size, self._embedding_size)
 
 
@@ -46,8 +46,8 @@ class SimpleLinear(torch.nn.Module):
         self.linear2 = torch.nn.Linear(sequence_length, sequence_length)
         self.linear3 = torch.nn.Linear(sequence_length, 1)
 
-    def forward(self, *, covariates: torch.Tensor, **kwargs):
-        x = covariates
+    def forward(self, *, window: torch.Tensor, **kwargs):
+        x = window
         mu = self.linear1(x)
         z = self.linear2(x)
         sigma = torch.abs(self.linear3((x - z) ** 2))
@@ -100,11 +100,9 @@ class TimeSeriesTransformer(torch.nn.Module):
         )
         self.reducer = torch.nn.Conv1d(sequence_length, 1, kernel_size=1)
 
-    def forward(
-        self, *, covariates: torch.Tensor, encoded_symbol: torch.Tensor, **kwargs
-    ):
-        batch_size, __sequence_length__ = covariates.shape
-        self.position_encoding = self.position_encoding.to(covariates.device)
+    def forward(self, *, window: torch.Tensor, encoded_symbol: torch.Tensor, **kwargs):
+        batch_size, __sequence_length__ = window.shape
+        self.position_encoding = self.position_encoding.to(window.device)
 
         position_embedding = (
             self.position_embedding(self.position_encoding)
@@ -112,7 +110,7 @@ class TimeSeriesTransformer(torch.nn.Module):
             .expand(batch_size, self.embedding_size, self.sequence_length)
         )
 
-        x = covariates[:, -self.sequence_length :].unsqueeze(
+        x = window[:, -self.sequence_length :].unsqueeze(
             1
         )  # Add channel dimension, assuming input shape (batch_size, time_steps)
 
@@ -162,8 +160,8 @@ class SymbolEmbeddings(torch.nn.Module):
             torch.nn.ReLU(),
         )
 
-    def forward(self, covariates, encoded_symbol, **kwargs):
-        time_series_embedding = self.embedding_model(covariates, **kwargs)
+    def forward(self, window, encoded_symbol, **kwargs):
+        time_series_embedding = self.embedding_model(window, **kwargs)
         symbol_embedding = self.symbol_embedding(encoded_symbol)
         return self.mixing_layers(
             torch.concat((time_series_embedding, symbol_embedding), dim=1)
@@ -231,10 +229,8 @@ class Convolutional(torch.nn.Module):
             ),
         )
 
-    def forward(
-        self, *, covariates: torch.Tensor, encoded_symbol: torch.Tensor, **kwargs
-    ):
-        x = covariates[:, -self.sequence_length :].unsqueeze(
+    def forward(self, *, window: torch.Tensor, encoded_symbol: torch.Tensor, **kwargs):
+        x = window[:, -self.sequence_length :].unsqueeze(
             1
         )  # Add channel dimension, assuming input shape (batch_size, time_steps)
         y = torch.mean(self.layers(x), dim=2)
@@ -295,10 +291,8 @@ class Convolutional2(torch.nn.Module):
             torch.nn.Dropout1d(CONVOLUTION_DROPOUT),
         )
 
-    def forward(
-        self, *, covariates: torch.Tensor, encoded_symbol: torch.Tensor, **kwargs
-    ):
-        x = covariates[:, -self.sequence_length :].unsqueeze(
+    def forward(self, *, window: torch.Tensor, encoded_symbol: torch.Tensor, **kwargs):
+        x = window[:, -self.sequence_length :].unsqueeze(
             1
         )  # Add channel dimension, assuming input shape (batch_size, time_steps)
         y = torch.mean(self.layers(x), dim=2)

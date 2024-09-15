@@ -94,3 +94,13 @@ def proper_get_portfolio_returns(
         result = -torch.flip(result, [1])
 
     return result
+
+
+def random_allocation(allocation_batches, symbol_count):
+    # NOTES: For the allocation, try choosing u in [0,1), then sigma = -5 *
+    # log(u), then allocation from sigma*randn()
+    sigma = -5 * torch.log(torch.rand(allocation_batches))
+    return sigma * torch.randn(allocation_batches, symbol_count)
+
+
+print(torch.softmax(random_allocation(16, 16), 1))
